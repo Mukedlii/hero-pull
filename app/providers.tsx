@@ -1,11 +1,16 @@
 "use client"
 
 import type { ReactNode } from "react"
-import { CrossmintProvider } from "@crossmint/client-sdk-react-ui"
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
+import { WagmiProvider } from "wagmi"
+import { wagmiConfig } from "@/lib/wagmi"
+
+const queryClient = new QueryClient()
 
 export function Providers({ children }: { children: ReactNode }) {
-  const apiKey = process.env.NEXT_PUBLIC_CROSSMINT_CLIENT_KEY
-  if (!apiKey) return <>{children}</>
-
-  return <CrossmintProvider apiKey={apiKey}>{children}</CrossmintProvider>
+  return (
+    <WagmiProvider config={wagmiConfig}>
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    </WagmiProvider>
+  )
 }
