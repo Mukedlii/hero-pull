@@ -1,38 +1,59 @@
 "use client"
 
-import { useState } from "react"
-import { generateHero, Hero } from "@/lib/heroes"
+import { useMemo } from "react"
+import { CrossmintHostedCheckout } from "@crossmint/client-sdk-react-ui"
 
 interface Props {
-  onPulled: (hero: Hero) => void
+  onPulled: (hero: any) => void
 }
 
 /**
- * TEMP: This button currently simulates a paid pull.
- * Crossmint checkout/minting will be wired next (the previous
- * CrossmintPayButton export is not available in the installed SDK).
+ * Crossmint checkout button for extra pulls.
+ * Note: The actual "Primary Sales Recipient" / payment receiver must be
+ * configured in Crossmint Console for the collection.
  */
-export default function MintButton({ onPulled }: Props) {
-  const [loading, setLoading] = useState(false)
+export default function MintButton(_props: Props) {
+  const collectionId = process.env.NEXT_PUBLIC_CROSSMINT_COLLECTION_ID
 
-  const handleClick = () => {
-    setLoading(true)
-    const hero = generateHero()
-    onPulled(hero)
-    setLoading(false)
+  const canRender = Boolean(process.env.NEXT_PUBLIC_CROSSMINT_API_KEY && collectionId)
+
+  const lineItems = useMemo(() => {
+    if (!collectionId) return []
+    // Best-effort locator format; adjust if Crossmint console expects a different locator.
+    return [{ collectionLocator: `crossmint:${collectionId}` }]
+  }, [collectionId])
+
+  if (!canRender) {
+    return (
+      <div className="flex flex-col items-center gap-2">
+        <button
+          disabled
+          className="bg-gray-700 text-white font-semibold py-3 px-6 rounded shadow opacity-60"
+        >
+          Mint (0.000777 ETH)
+        </button>
+        <p className="text-xs text-gray-500">
+          Missing Crossmint env vars (API key / collection id).
+        </p>
+      </div>
+    )
   }
 
   return (
     <div className="flex flex-col items-center gap-2">
-      <button
-        disabled={loading}
-        onClick={handleClick}
-        className="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-3 px-6 rounded shadow disabled:opacity-50"
+      <CrossmintHostedCheckout
+        lineItems={lineItems as any}
+        payment={{
+          fiat: { enabled: false },
+          crypto: { enabled: true, defaultChain: "base" },
+          defaultMethod: "crypto",
+        } as any}
+        className="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-3 px-6 rounded shadow"
       >
-        {loading ? "Pulling..." : "Pull Hero (0.00066 ETH)"}
-      </button>
+        Mint (0.000777 ETH)
+      </CrossmintHostedCheckout>
       <p className="text-xs text-gray-500">
-        Minting checkout (Crossmint) is being enabled.
+        Payments receiver set in Crossmint Console (Base).
       </p>
     </div>
   )
