@@ -22,13 +22,11 @@ export const metadata: Metadata = {
   },
 }
 
-import { Providers } from "./providers"
-
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <body className="bg-black text-white min-h-screen flex justify-center items-start">
-        <Providers>{children}</Providers>
+        {children}
       </body>
     </html>
   )
