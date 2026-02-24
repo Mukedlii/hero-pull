@@ -33,7 +33,7 @@ export default function MintButton({ onPulled }: Props) {
       onClick={handleMint}
       className="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-black font-bold py-4 px-10 rounded-2xl shadow-lg text-lg transition-all disabled:opacity-60"
     >
-      {loading ? "Opening..." : "Mint Hero (0.000777 ETH)"}
+      {loading ? "Opening..." : "Mint Hero (0.00066 ETH)"}
     </button>
   )
 }
