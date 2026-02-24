@@ -1,0 +1,17 @@
+{
+  "accountAssociation": {
+    "header": "",
+    "payload": "",
+    "signature": ""
+  },
+  "frame": {
+    "version": "1",
+    "name": "Hero Pull",
+    "iconUrl": "https://hero-pull.vercel.app/icon.png",
+    "homeUrl": "https://hero-pull.vercel.app",
+    "imageUrl": "https://hero-pull.vercel.app/og.png",
+    "buttonTitle": "Pull a Hero!",
+    "splashImageUrl": "https://hero-pull.vercel.app/splash.png",
+    "splashBackgroundColor": "#1a1a2e"
+  }
+}
