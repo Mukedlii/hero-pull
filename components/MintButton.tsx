@@ -53,7 +53,7 @@ export default function MintButton({ onPulled }: Props) {
         onClick={handleClick}
         className="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-3 px-6 rounded shadow disabled:opacity-50"
       >
-        {loading ? "Pulling..." : "Pull Hero (0.000777 ETH)"}
+        {loading ? "Pulling..." : "Pull Hero (0.00066 ETH)"}
       </button>
 
       {showModal && (
