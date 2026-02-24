@@ -37,8 +37,12 @@ export default function HeroPull() {
 
   const handleShare = async () => {
     if (!hero) return
-    const text = `I pulled a ${hero.rarity} hero!\n\n${hero.name} - ${hero.power}\n\nPull yours: https://hero-pull.vercel.app`
-    window.open(`https://warpcast.com/~/compose?text=${encodeURIComponent(text)}`, '_blank')
+    const text = `I pulled a ${hero.rarity} hero in Hero Pull! ⚔️\n\n${hero.name} ⚡️ Power: ${hero.power}\n\nPlay here 👇`
+    const frameUrl = 'https://hero-pull.vercel.app'
+    window.open(
+      `https://warpcast.com/~/compose?text=${encodeURIComponent(text)}&embeds[]=${encodeURIComponent(frameUrl)}`,
+      '_blank'
+    )
   }
 
   const rarityColors: Record<string, string> = {
