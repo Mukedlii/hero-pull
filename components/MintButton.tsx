@@ -19,9 +19,9 @@ export default function MintButton({ onPulled }: Props) {
     const collectionId = "529862be-ba1e-4792-a533-2dc9e68f97c6"
     const clientId = process.env.NEXT_PUBLIC_CROSSMINT_CLIENT_KEY
 
-    const mintUrl = `https://www.crossmint.com/checkout/mint?clientId=${encodeURIComponent(
+    const mintUrl = `https://crossmint.com/checkout?clientId=${encodeURIComponent(
       clientId || ""
-    )}&collectionId=${encodeURIComponent(collectionId)}&quantity=1`
+    )}&collectionId=${encodeURIComponent(collectionId)}&quantity=1&currency=eth&locale=en-US`
 
     window.open(mintUrl, "_blank")
     setLoading(false)
