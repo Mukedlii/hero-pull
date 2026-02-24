@@ -37,7 +37,9 @@ export default function HeroPull() {
 
   const handleShare = async () => {
     if (!hero) return
-    const text = `I pulled a ${hero.rarity.toUpperCase()} hero in Hero Pull!\n\n${hero.name}\nPower: ${hero.power}\n\nTry your luck!`
+    const origin = typeof window !== 'undefined' ? window.location.origin : ''
+    const frameUrl = origin ? `${origin}/api/frame` : ''
+    const text = `I pulled a ${hero.rarity.toUpperCase()} hero in Hero Pull!\n\n${hero.name}\nPower: ${hero.power}\n\nTry your luck!\n\nPlay/Mint: ${origin}\nFrame: ${frameUrl}`
     window.open(`https://warpcast.com/~/compose?text=${encodeURIComponent(text)}`, '_blank')
   }
 
