@@ -109,18 +109,13 @@ export default function HeroPull() {
         <div className="flex flex-col items-center gap-3">
           <button
             onClick={handleShare}
-            className="bg-purple-700 hover:bg-purple-600 text-white py-2 px-6 rounded-xl text-sm font-semibold"
+            className="bg-purple-700 hover:bg-purple-600 text-white py-2 px-6 rounded-xl text-sm font-semibold flex items-center gap-2"
           >
-            Share on Warpcast
+            <span>Share on Warpcast</span>
+            {hasShared && <span className="text-green-400 text-base">✓</span>}
           </button>
 
-          {hasShared ? (
-            <MintButton onPulled={(h) => setHero(h)} />
-          ) : (
-            <div className="text-gray-500 text-xs text-center max-w-sm">
-              Mint unlocks after sharing.
-            </div>
-          )}
+          <MintButton onPulled={(h) => setHero(h)} />
         </div>
       )}
 
