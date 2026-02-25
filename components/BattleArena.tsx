@@ -83,7 +83,7 @@ export default function BattleArena({ hero, opponent, winner, onBattleAgain, onS
 
       {/* Control buttons */}
       {winner && (
-        <div className="flex gap-4 mt-2">
+        <div className="flex gap-4 mt-4">
           <button onClick={onBattleAgain} className="bg-green-600 hover:bg-green-500 text-white py-2 px-4 rounded">
             Battle Again
           </button>

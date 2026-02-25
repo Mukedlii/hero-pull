@@ -9,25 +9,33 @@ export default function BattlePage() {
   const [opponent, setOpponent] = useState<Hero | null>(null)
   const [winner, setWinner] = useState<"hero" | "opponent" | null>(null)
 
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("hero-pull-current-hero")
+      setHero(raw ? (JSON.parse(raw) as Hero) : null)
+    } catch {
+      setHero(null)
+    }
+  }, [])
+
   const rollBattle = () => {
-    const h = generateHero()
+    if (!hero) return
+
     const o = generateHero()
-    setHero(h)
     setOpponent(o)
     setWinner(null)
 
-    // simple outcome after a short delay
     setTimeout(() => {
-      const heroScore = h.attack + h.defense + h.speed
+      const heroScore = hero.attack + hero.defense + hero.speed
       const oppScore = o.attack + o.defense + o.speed
       setWinner(heroScore >= oppScore ? "hero" : "opponent")
     }, 900)
   }
 
   useEffect(() => {
-    rollBattle()
+    if (hero) rollBattle()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [hero])
 
   const shareText = useMemo(() => {
     if (!hero || !opponent || !winner) return ""
@@ -41,12 +49,26 @@ export default function BattlePage() {
     window.open(url, "_blank")
   }
 
-  if (!hero || !opponent) return null
+  if (!hero) {
+    return (
+      <div className="px-4 pb-24">
+        <h1 className="text-2xl font-extrabold text-center mt-6">Battle</h1>
+        <p className="text-center text-gray-400 mt-4">Choose a hero first!</p>
+        <div className="flex justify-center mt-6">
+          <a href="/collection" className="bg-purple-700 hover:bg-purple-600 text-white py-2 px-4 rounded-lg">
+            Go to My Heroes
+          </a>
+        </div>
+      </div>
+    )
+  }
+
+  if (!opponent) return null
 
   return (
-    <div className="px-4 pb-20">
+    <div className="px-4 pb-24">
       <h1 className="text-2xl font-extrabold text-center mt-6">Battle</h1>
-      <p className="text-center text-gray-400 mt-2 text-sm">Fight an opponent hero</p>
+      <p className="text-center text-gray-400 mt-2 text-sm">Fight a random opponent!</p>
 
       <BattleArena hero={hero} opponent={opponent} winner={winner} onBattleAgain={rollBattle} onShare={handleShare} />
     </div>
