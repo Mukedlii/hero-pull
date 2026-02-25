@@ -38,9 +38,19 @@ export async function GET(req: NextRequest) {
     toBlock: latest,
   } as any)
 
-  const tokenIds = logs
-    .map((l) => (l.args as any).tokenId as bigint)
-    .filter((x) => typeof x === 'bigint')
+  // When typings aren't inferred, `getLogs()` returns raw logs without `args`.
+  // Transfer has indexed tokenId as topic[3].
+  const tokenIds = (logs as any[])
+    .map((l) => {
+      const t = l?.topics?.[3]
+      if (!t) return null
+      try {
+        return BigInt(t)
+      } catch {
+        return null
+      }
+    })
+    .filter((x): x is bigint => typeof x === 'bigint')
 
   // De-dupe
   const unique = Array.from(new Set(tokenIds.map((x) => x.toString()))).map((s) => BigInt(s))
