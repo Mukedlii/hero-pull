@@ -43,10 +43,10 @@ export default function BattlePage() {
     const frameUrl = "https://hero-pull.vercel.app"
 
     if (winner === "hero") {
-      return `omg én nyertem, úgy sem tudtok legyőzni 😎😂🤣😜✨\n\n${hero.name} DESTROYED ${opponent.name} ⚔️\n\nGyere te is: ${frameUrl}`
+      return `OMG I WON — you still can’t beat me 😎😂🤣😜✨\n\n${hero.name} DESTROYED ${opponent.name} ⚔️\n\nPlay here 👇\n${frameUrl}`
     }
 
-    return `Gyertek segíteni legyőzni ${opponent.name}-t!! 😭🙏⚔️\n\nÉn kikaptam vele…\n\nFrame: ${frameUrl}`
+    return `I LOST… Help me beat ${opponent.name}! 😭🙏⚔️\n\nPlay here 👇\n${frameUrl}`
   }, [hero, opponent, winner])
 
   const handleShare = async () => {
