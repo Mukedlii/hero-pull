@@ -98,14 +98,14 @@ export default function HeroPull() {
             {hero.rarity}
           </div>
           <div
-            className={`relative w-36 h-36 rounded-xl overflow-hidden mx-auto mb-3 border-2 ${
+            className={`relative w-36 h-36 rounded-xl overflow-hidden mx-auto mb-3 ${
               hero.rarity === 'Legendary'
-                ? 'border-yellow-400 shadow-[0_0_20px_#ffd700]'
+                ? 'shadow-[0_0_20px_#ffd700]'
                 : hero.rarity === 'Epic'
-                  ? 'border-purple-500 shadow-[0_0_15px_#c084fc]'
+                  ? 'shadow-[0_0_15px_#c084fc]'
                   : hero.rarity === 'Rare'
-                    ? 'border-blue-500 shadow-[0_0_12px_#60a5fa]'
-                    : 'border-gray-500'
+                    ? 'shadow-[0_0_12px_#60a5fa]'
+                    : ''
             }`}
           >
             <img
