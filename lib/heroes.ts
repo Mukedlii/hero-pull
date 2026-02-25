@@ -1,19 +1,14 @@
-/**
- * Helper functions for generating random heroes.
- *
- * A hero is composed of a name, gender, power, rarity and
- * image URL. The generation logic uses weighted probabilities
- * for rarity to ensure the distribution specified in the game
- * description. DiceBear is used to generate deterministic
- * avatars based on the hero’s name.
- */
-
 export type Hero = {
   name: string
   gender: 'Male' | 'Female' | 'Unknown'
   power: string
   rarity: 'Common' | 'Rare' | 'Epic' | 'Legendary'
   imageUrl: string
+  attack: number
+  defense: number
+  speed: number
+  xp: number
+  level: number
 }
 
 const names = [
@@ -84,19 +79,26 @@ const powers = [
   'Lightning Strike',
   'Shadow Clone',
   'Elemental Burst',
-  'Healing Touch'
+  'Healing Touch',
+  'Gravity Pull',
+  'Fire Storm',
+  'Ice Prison',
+  'Thunder Smash',
+  'Dark Void',
+  'Light Beam',
+  'Psychic Wave',
+  'Force Shield',
+  'Energy Drain',
+  'Dimension Slash',
+  'Plasma Cannon',
+  'Sonic Boom',
+  'Meteor Strike',
+  'Earthquake Fist',
+  'Wind Slash',
 ]
 
 const genders: Hero['gender'][] = ['Male', 'Female', 'Unknown']
 
-/**
- * Generates a weighted random rarity based on pre‑defined
- * probabilities. The distribution is as follows:
- *  - Common: 60%
- *  - Rare: 25%
- *  - Epic: 12%
- *  - Legendary: 3%
- */
 export function generateRarity(): Hero['rarity'] {
   const roll = Math.random() * 100
   if (roll < 60) return 'Common'
@@ -105,14 +107,34 @@ export function generateRarity(): Hero['rarity'] {
   return 'Legendary'
 }
 
-/**
- * Generates a random hero.
- */
+function generateStatForRarity(rarity: Hero['rarity']): number {
+  const ranges: Record<Hero['rarity'], [number, number]> = {
+    Common: [10, 40],
+    Rare: [30, 60],
+    Epic: [50, 80],
+    Legendary: [70, 100],
+  }
+  const [min, max] = ranges[rarity]
+  return Math.floor(Math.random() * (max - min + 1)) + min
+}
+
 export function generateHero(): Hero {
   const name = names[Math.floor(Math.random() * names.length)]
   const gender = genders[Math.floor(Math.random() * genders.length)]
   const power = powers[Math.floor(Math.random() * powers.length)]
   const rarity = generateRarity()
-  const imageUrl = `/heroes/${name.toLowerCase().trim().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')}.png`
-  return { name, gender, power, rarity, imageUrl }
+  const filename = name.toLowerCase().replace(/ /g, '_') + '.png'
+  const imageUrl = `/heroes/${filename}`
+  return {
+    name,
+    gender,
+    power,
+    rarity,
+    imageUrl,
+    attack: generateStatForRarity(rarity),
+    defense: generateStatForRarity(rarity),
+    speed: generateStatForRarity(rarity),
+    xp: 0,
+    level: 1,
+  }
 }
