@@ -56,11 +56,23 @@ async function providerRequestWithTimeout(args: RequestArgs, timeoutMs = 20_000)
 async function waitForReceipt(hash: string, timeoutMs = 120_000) {
   const start = Date.now()
   while (Date.now() - start < timeoutMs) {
-    const receipt = await providerRequest({
-      method: "eth_getTransactionReceipt",
-      params: [hash],
-    })
-    if (receipt) return receipt
+    try {
+      const receipt = await providerRequest({
+        method: "eth_getTransactionReceipt",
+        params: [hash],
+      })
+      if (receipt) return receipt
+    } catch (e: any) {
+      // Some embedded providers (Warpcast) don't support receipt polling.
+      if (
+        typeof e?.message === "string" &&
+        e.message.toLowerCase().includes("does not support")
+      ) {
+        return null
+      }
+      throw e
+    }
+
     await new Promise((r) => setTimeout(r, 1500))
   }
   throw new Error("Timed out waiting for transaction confirmation")
@@ -144,14 +156,20 @@ export default function MintButton({ onPulled }: Props) {
       })) as string
 
       setTxHash(hash)
-      setStatus("Confirming…")
 
+      // Warpcast embedded provider may not support receipt polling.
+      if (isWarpcastProvider()) {
+        setStatus("Transaction sent — check wallet / Basescan")
+        return
+      }
+
+      setStatus("Confirming…")
       const receipt = await waitForReceipt(hash)
-      if (receipt?.status && receipt.status !== "0x1") {
+      if (receipt && receipt?.status && receipt.status !== "0x1") {
         throw new Error("Transaction failed")
       }
 
-      setStatus("Hero minted!")
+      setStatus(receipt ? "Hero minted!" : "Transaction sent — check Basescan")
     } catch (err: any) {
       setError(err?.message || String(err))
     } finally {
