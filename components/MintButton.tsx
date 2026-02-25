@@ -113,6 +113,7 @@ export default function MintButton({ onPulled }: Props) {
         method: "eth_sendTransaction",
         params: [
           {
+            chainId: BASE_CHAIN_ID_HEX,
             to: RECEIVER_ADDRESS,
             data: "0x",
             value: MINT_VALUE_WEI_HEX,
