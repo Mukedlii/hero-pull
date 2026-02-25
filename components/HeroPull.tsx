@@ -97,27 +97,15 @@ export default function HeroPull() {
           <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gray-800 px-3 py-1 rounded-full text-xs font-bold border border-gray-600">
             {hero.rarity}
           </div>
-          <div
-            className={`relative w-36 h-36 rounded-xl overflow-hidden mx-auto mb-3 ${
-              hero.rarity === 'Legendary'
-                ? 'shadow-[0_0_20px_#ffd700]'
-                : hero.rarity === 'Epic'
-                  ? 'shadow-[0_0_15px_#c084fc]'
-                  : hero.rarity === 'Rare'
-                    ? 'shadow-[0_0_12px_#60a5fa]'
-                    : ''
-            }`}
-          >
-            <img
-              src={hero.imageUrl}
-              alt={hero.name}
-              className="w-full h-full object-cover"
-              onError={(e) => {
-                const seed = encodeURIComponent(hero.name)
-                e.currentTarget.src = `https://api.dicebear.com/7.x/adventurer/svg?seed=${seed}`
-              }}
-            />
-          </div>
+          <img
+            src={hero.imageUrl}
+            alt={hero.name}
+            className="w-36 h-36 rounded-xl mx-auto mb-3 object-cover"
+            onError={(e) => {
+              const seed = encodeURIComponent(hero.name)
+              e.currentTarget.src = `https://api.dicebear.com/7.x/adventurer/svg?seed=${seed}`
+            }}
+          />
           <h2 className="text-2xl font-extrabold mb-1">{hero.name}</h2>
           <p className="text-gray-300 text-sm">Power: {hero.power}</p>
           <p className="text-gray-400 text-xs mt-1">{hero.gender}</p>

@@ -1,6 +1,5 @@
 import "./globals.css"
 import type { Metadata } from "next"
-import Link from "next/link"
 
 export const metadata: Metadata = {
   title: "Hero Pull",
@@ -32,18 +31,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
           <nav className="sticky bottom-0 w-full border-t border-gray-800 bg-black/90 backdrop-blur px-4 py-3">
             <div className="flex items-center justify-between text-sm font-semibold">
-              <Link className="text-gray-200 hover:text-white" href="/">
+              <a className="text-gray-200 hover:text-white" href="/">
                 🏠 Home
-              </Link>
-              <Link className="text-gray-200 hover:text-white" href="/battle">
+              </a>
+              <a className="text-gray-200 hover:text-white" href="/battle">
                 ⚔️ Battle
-              </Link>
-              <Link className="text-gray-200 hover:text-white" href="/merge">
+              </a>
+              <a className="text-gray-200 hover:text-white" href="/merge">
                 ⚗️ Merge
-              </Link>
-              <Link className="text-gray-200 hover:text-white" href="/stats">
+              </a>
+              <a className="text-gray-200 hover:text-white" href="/stats">
                 📊 Stats
-              </Link>
+              </a>
             </div>
           </nav>
         </div>
