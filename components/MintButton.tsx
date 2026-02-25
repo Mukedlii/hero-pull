@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import frameSdk from "@farcaster/frame-sdk"
 import { generateHero, type Hero } from "@/lib/heroes"
 import {
   HERO_PULL_CONTRACT_ADDRESS,
@@ -11,10 +12,12 @@ interface Props {
   onPulled: (hero: Hero) => void
 }
 
+type RequestArgs = { method: string; params?: any[] }
+
 declare global {
   interface Window {
     ethereum?: {
-      request: (args: { method: string; params?: any[] }) => Promise<any>
+      request: (args: RequestArgs) => Promise<any>
     }
   }
 }
@@ -25,10 +28,22 @@ const MINT_SELECTOR = "0x1249c58b" // mint()
 // 0.00066 ETH = 660000000000000 wei
 const MINT_VALUE_WEI_HEX = "0x2588c3b42c000" as const
 
+function getProvider() {
+  // In Warpcast (Frame/Miniapp), this routes through Warpcast's built-in wallet.
+  // In a normal browser, it falls back to injected wallets (MetaMask/Coinbase).
+  return frameSdk?.wallet?.ethProvider ?? window.ethereum
+}
+
+async function providerRequest(args: RequestArgs) {
+  const provider = getProvider()
+  if (!provider) throw new Error("No wallet provider available")
+  return provider.request(args)
+}
+
 async function waitForReceipt(hash: string, timeoutMs = 120_000) {
   const start = Date.now()
   while (Date.now() - start < timeoutMs) {
-    const receipt = await window.ethereum?.request({
+    const receipt = await providerRequest({
       method: "eth_getTransactionReceipt",
       params: [hash],
     })
@@ -51,26 +66,30 @@ export default function MintButton({ onPulled }: Props) {
     const hero = generateHero()
     onPulled(hero)
 
-    if (!window.ethereum) {
-      setError("No wallet found (install MetaMask/Coinbase Wallet).")
+    if (!getProvider()) {
+      setError("No wallet provider found.")
       return
     }
 
     try {
       setBusy(true)
 
-      // Connect
-      await window.ethereum.request({ method: "eth_requestAccounts" })
-
-      // Ensure Base mainnet
+      // Connect (noop in Warpcast, required for injected wallets)
       try {
-        await window.ethereum.request({
+        await providerRequest({ method: "eth_requestAccounts" })
+      } catch {
+        // ignore
+      }
+
+      // Ensure Base mainnet (may be unsupported in Warpcast; best-effort)
+      try {
+        await providerRequest({
           method: "wallet_switchEthereumChain",
           params: [{ chainId: BASE_CHAIN_ID_HEX }],
         })
       } catch (e: any) {
         if (e?.code === 4902) {
-          await window.ethereum.request({
+          await providerRequest({
             method: "wallet_addEthereumChain",
             params: [
               {
@@ -83,12 +102,12 @@ export default function MintButton({ onPulled }: Props) {
             ],
           })
         } else {
-          throw e
+          // ignore if not supported
         }
       }
 
       setStatus("Opening wallet…")
-      const hash = await window.ethereum.request({
+      const hash = await providerRequest({
         method: "eth_sendTransaction",
         params: [
           {
