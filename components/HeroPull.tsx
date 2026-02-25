@@ -58,6 +58,23 @@ export default function HeroPull() {
     // Mark as shared immediately after user initiates sharing (best-effort gating)
     setHasShared(true)
 
+    // Best-effort server event (FID-based). If not in FC context, this will no-op.
+    ;(async () => {
+      try {
+        const { sdk } = await import('@farcaster/frame-sdk')
+        const ctx: any = await sdk.context
+        const fid = ctx?.user?.fid
+        if (!fid) return
+        await fetch('/api/event', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ fid, action: 'share' }),
+        })
+      } catch {
+        // ignore
+      }
+    })()
+
     // In Warpcast, prefer SDK openUrl so it opens in-app (otherwise iOS may show Farcaster download page)
     try {
       const { sdk } = await import('@farcaster/frame-sdk')

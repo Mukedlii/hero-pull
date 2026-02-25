@@ -62,6 +62,23 @@ export default function BattlePage() {
     const frameUrl = "https://hero-pull.vercel.app"
     const url = `https://warpcast.com/~/compose?text=${encodeURIComponent(shareText)}&embeds[]=${encodeURIComponent(frameUrl)}`
 
+    // Best-effort server event for share (FID-based).
+    ;(async () => {
+      try {
+        const { sdk } = await import("@farcaster/frame-sdk")
+        const ctx: any = await sdk.context
+        const fid = ctx?.user?.fid
+        if (!fid) return
+        await fetch('/api/event', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ fid, action: 'share' }),
+        })
+      } catch {
+        // ignore
+      }
+    })()
+
     // In Warpcast, prefer SDK openUrl so it opens in-app (otherwise iOS may show Farcaster download page)
     try {
       const { sdk } = await import("@farcaster/frame-sdk")
