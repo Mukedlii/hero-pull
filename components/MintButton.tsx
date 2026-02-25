@@ -3,10 +3,7 @@
 import { useState } from "react"
 import frameSdk from "@farcaster/frame-sdk"
 import { generateHero, type Hero } from "@/lib/heroes"
-import {
-  HERO_PULL_CONTRACT_ADDRESS,
-  HERO_PULL_MINT_PRICE_ETH,
-} from "@/lib/heroPullContract"
+import { HERO_PULL_MINT_PRICE_ETH } from "@/lib/heroPullContract"
 
 interface Props {
   onPulled: (hero: Hero) => void
@@ -51,31 +48,6 @@ async function providerRequestWithTimeout(args: RequestArgs, timeoutMs = 20_000)
       setTimeout(() => reject(new Error("Wallet request timed out")), timeoutMs)
     ),
   ])
-}
-
-async function waitForReceipt(hash: string, timeoutMs = 120_000) {
-  const start = Date.now()
-  while (Date.now() - start < timeoutMs) {
-    try {
-      const receipt = await providerRequest({
-        method: "eth_getTransactionReceipt",
-        params: [hash],
-      })
-      if (receipt) return receipt
-    } catch (e: any) {
-      // Some embedded providers (Warpcast) don't support receipt polling.
-      if (
-        typeof e?.message === "string" &&
-        e.message.toLowerCase().includes("does not support")
-      ) {
-        return null
-      }
-      throw e
-    }
-
-    await new Promise((r) => setTimeout(r, 1500))
-  }
-  throw new Error("Timed out waiting for transaction confirmation")
 }
 
 export default function MintButton({ onPulled }: Props) {
@@ -156,20 +128,11 @@ export default function MintButton({ onPulled }: Props) {
       })) as string
 
       setTxHash(hash)
-
-      // Warpcast embedded provider may not support receipt polling.
-      if (isWarpcastProvider()) {
-        setStatus("Transaction sent — check wallet / Basescan")
-        return
-      }
-
       setStatus("Confirming…")
-      const receipt = await waitForReceipt(hash)
-      if (receipt && receipt?.status && receipt.status !== "0x1") {
-        throw new Error("Transaction failed")
-      }
 
-      setStatus(receipt ? "Hero minted!" : "Transaction sent — check Basescan")
+      // No confirmation/receipt polling (Warpcast provider doesn't support it reliably).
+      await new Promise((r) => setTimeout(r, 2000))
+      setStatus("Minted!")
     } catch (err: any) {
       setError(err?.message || String(err))
     } finally {
@@ -189,16 +152,22 @@ export default function MintButton({ onPulled }: Props) {
 
       {txHash && (
         <div className="text-xs text-gray-300 text-center break-all font-mono">
-          Tx: {txHash}
+          <div>Tx: {txHash}</div>
+          <a
+            href={`https://basescan.org/tx/${txHash}`}
+            target="_blank"
+            rel="noreferrer"
+            className="text-blue-400 underline"
+          >
+            View on BaseScan
+          </a>
         </div>
       )}
 
       {status && <div className="text-sm font-semibold text-green-400">{status}</div>}
 
       {error && (
-        <div className="text-xs text-red-400 text-center break-words max-w-sm">
-          {error}
-        </div>
+        <div className="text-xs text-red-400 text-center break-words max-w-sm">{error}</div>
       )}
     </div>
   )
