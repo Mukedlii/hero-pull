@@ -1,10 +1,10 @@
-import { ethers } from "hardhat";
+const hre = require("hardhat");
 
 async function main() {
-  const [deployer] = await ethers.getSigners();
+  const [deployer] = await hre.ethers.getSigners();
   console.log("Deploying with:", deployer.address);
 
-  const HeroPull = await ethers.getContractFactory("HeroPull");
+  const HeroPull = await hre.ethers.getContractFactory("HeroPull");
   const heroPull = await HeroPull.deploy();
   await heroPull.waitForDeployment();
 
