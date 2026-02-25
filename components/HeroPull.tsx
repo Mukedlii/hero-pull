@@ -8,6 +8,7 @@ export default function HeroPull() {
   const [hero, setHero] = useState<Hero | null>(null)
   const [isFreeAvailable, setFreeAvailable] = useState(true)
   const [isRevealing, setIsRevealing] = useState(false)
+  const [hasShared, setHasShared] = useState(false)
 
   useEffect(() => {
     const initSDK = async () => {
@@ -29,6 +30,7 @@ export default function HeroPull() {
     await new Promise(r => setTimeout(r, 800))
     const newHero = generateHero()
     setHero(newHero)
+    setHasShared(false)
     const today = new Date().toDateString()
     localStorage.setItem('hero-pull-last-free', today)
     setFreeAvailable(false)
@@ -40,6 +42,9 @@ export default function HeroPull() {
     const text = `I pulled a ${hero.rarity} hero in Hero Pull! ⚔️\n\n${hero.name} ⚡️ Power: ${hero.power}\n\nPlay here 👇`
     const frameUrl = 'https://hero-pull.vercel.app'
     const url = `https://warpcast.com/~/compose?text=${encodeURIComponent(text)}&embeds[]=${encodeURIComponent(frameUrl)}`
+
+    // Mark as shared immediately after user initiates sharing (best-effort gating)
+    setHasShared(true)
 
     // In Warpcast, prefer SDK openUrl so it opens in-app (otherwise iOS may show Farcaster download page)
     try {
@@ -77,9 +82,7 @@ export default function HeroPull() {
         >
           {isRevealing ? 'Revealing...' : 'Pull Hero (FREE)'}
         </button>
-      ) : (
-        <MintButton onPulled={(h) => setHero(h)} />
-      )}
+      ) : null}
 
       {isRevealing && <div className="text-4xl animate-bounce">🎴</div>}
 
@@ -103,12 +106,22 @@ export default function HeroPull() {
       )}
 
       {hero && !isRevealing && (
-        <button
-          onClick={handleShare}
-          className="bg-purple-700 hover:bg-purple-600 text-white py-2 px-6 rounded-xl text-sm font-semibold"
-        >
-          Share on Warpcast
-        </button>
+        <div className="flex flex-col items-center gap-3">
+          <button
+            onClick={handleShare}
+            className="bg-purple-700 hover:bg-purple-600 text-white py-2 px-6 rounded-xl text-sm font-semibold"
+          >
+            Share on Warpcast
+          </button>
+
+          {hasShared ? (
+            <MintButton onPulled={(h) => setHero(h)} />
+          ) : (
+            <div className="text-gray-500 text-xs text-center max-w-sm">
+              Mint unlocks after sharing.
+            </div>
+          )}
+        </div>
       )}
 
       {hero && !isFreeAvailable && (
