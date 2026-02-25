@@ -12,6 +12,9 @@ const rarityBorder: Record<Hero["rarity"], string> = {
 
 export default function CollectionPage() {
   const [collection, setCollection] = useState<Hero[]>([])
+  const [walletAddress, setWalletAddress] = useState<string | null>(null)
+  const [onchainTokenIds, setOnchainTokenIds] = useState<string[]>([])
+  const [loadingOnchain, setLoadingOnchain] = useState(false)
 
   useEffect(() => {
     try {
@@ -21,33 +24,52 @@ export default function CollectionPage() {
       setCollection([])
     }
 
-    // Best-effort: if user has onchain NFTs, we can show tokenIds later.
-    // (Requires wallet address; Warpcast provider sometimes supports eth_accounts.)
+    // Onchain restore: fetch owned tokenIds for connected wallet.
     ;(async () => {
       try {
-        const provider: any = (await import("@farcaster/frame-sdk")).default?.wallet?.ethProvider
-        const accounts = provider ? await provider.request({ method: "eth_accounts" }) : []
-        const address = accounts?.[0]
-        if (!address) return
-        await fetch(`/api/nft/owned?address=${address}`)
+        setLoadingOnchain(true)
+        const mod: any = await import("@farcaster/frame-sdk")
+        const provider = mod?.sdk?.wallet?.ethProvider || mod?.default?.wallet?.ethProvider
+        if (!provider) return
+
+        const accounts = await provider.request({ method: "eth_accounts" })
+        const addr = accounts?.[0]
+        if (!addr) return
+
+        setWalletAddress(addr)
+        const res = await fetch(`/api/nft/owned?address=${addr}`, { cache: "no-store" })
+        const json = await res.json()
+        setOnchainTokenIds(Array.isArray(json?.tokenIds) ? json.tokenIds : [])
       } catch {
         // ignore
+      } finally {
+        setLoadingOnchain(false)
       }
     })()
   }, [])
 
   const isEmpty = useMemo(() => !collection || collection.length === 0, [collection])
+  const hasOnchain = useMemo(() => onchainTokenIds.length > 0, [onchainTokenIds])
 
   const selectHero = (hero: Hero) => {
     localStorage.setItem("hero-pull-current-hero", JSON.stringify(hero))
     window.location.href = "/battle"
   }
 
-  if (isEmpty) {
+  if (isEmpty && !hasOnchain) {
     return (
       <div className="px-4 pb-24">
         <h1 className="text-2xl font-extrabold text-center mt-6">My Heroes</h1>
         <p className="text-center text-gray-400 mt-4">No heroes yet! Go pull some 🦸</p>
+
+        <div className="mt-4 text-xs text-gray-500 text-center">
+          {loadingOnchain
+            ? "Checking onchain NFTs…"
+            : walletAddress
+              ? "If you minted NFTs, they are onchain. If you don’t see them here, try reopening the mini app."
+              : "If you minted NFTs, open this in Warpcast with a connected wallet to restore them from chain."}
+        </div>
+
         <div className="flex justify-center mt-6">
           <a href="/" className="bg-purple-700 hover:bg-purple-600 text-white py-2 px-4 rounded-lg">
             Go Pull a Hero
@@ -61,6 +83,19 @@ export default function CollectionPage() {
     <div className="px-4 pb-24">
       <h1 className="text-2xl font-extrabold text-center mt-6">My Heroes</h1>
       <p className="text-center text-gray-400 mt-2 text-sm">Your pulled heroes</p>
+
+      {walletAddress && (
+        <div className="mt-3 text-center text-xs text-gray-500">
+          Wallet: {walletAddress.slice(0, 6)}…{walletAddress.slice(-4)}
+        </div>
+      )}
+
+      {hasOnchain && (
+        <div className="mt-4 p-3 rounded-xl border border-gray-700 bg-gray-900">
+          <p className="text-sm font-bold">Onchain NFTs (restored)</p>
+          <p className="text-xs text-gray-400 mt-1">Token IDs: {onchainTokenIds.join(", ")}</p>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-3 mt-6">
         {collection.map((hero, idx) => (
@@ -85,6 +120,12 @@ export default function CollectionPage() {
           </div>
         ))}
       </div>
+
+      {!collection.length && hasOnchain && (
+        <div className="mt-6 text-center text-sm text-gray-400">
+          Onchain NFTs found, but local hero gallery is empty (cache reset). This is expected.
+        </div>
+      )}
     </div>
   )
 }

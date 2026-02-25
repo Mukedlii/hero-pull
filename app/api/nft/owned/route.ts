@@ -9,6 +9,7 @@ const DEFAULT_LOOKBACK_BLOCKS = 200_000n
 
 const abi = parseAbi([
   'event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)',
+  'function ownerOf(uint256 tokenId) view returns (address)',
 ])
 
 export async function GET(req: NextRequest) {
@@ -55,11 +56,27 @@ export async function GET(req: NextRequest) {
   // De-dupe
   const unique = Array.from(new Set(tokenIds.map((x) => x.toString()))).map((s) => BigInt(s))
 
+  // Keep only tokens still owned by address (handles transfers out)
+  const owned: bigint[] = []
+  for (const id of unique) {
+    try {
+      const owner = await (client as any).readContract({
+        address: CONTRACT,
+        abi,
+        functionName: 'ownerOf',
+        args: [id],
+      })
+      if (String(owner).toLowerCase() === address.toLowerCase()) owned.push(id)
+    } catch {
+      // ignore (non-ERC721 or RPC hiccup)
+    }
+  }
+
   return NextResponse.json({
     contract: CONTRACT,
     address,
     fromBlock: fromBlock.toString(),
     latest: latest.toString(),
-    tokenIds: unique.map((x) => x.toString()),
+    tokenIds: owned.map((x) => x.toString()),
   })
 }
