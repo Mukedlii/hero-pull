@@ -1,19 +1,10 @@
 "use client"
 
-import { useMemo, useState } from "react"
-import { parseEther } from "viem"
-import { base } from "wagmi/chains"
-import {
-  useAccount,
-  useConnect,
-  useDisconnect,
-  useSwitchChain,
-  useWaitForTransactionReceipt,
-  useWriteContract,
-} from "wagmi"
+import { useState } from "react"
+import { createPublicClient, http, parseEther } from "viem"
+import { base } from "viem/chains"
 import { generateHero, type Hero } from "@/lib/heroes"
 import {
-  HERO_PULL_ABI,
   HERO_PULL_CONTRACT_ADDRESS,
   HERO_PULL_MINT_PRICE_ETH,
 } from "@/lib/heroPullContract"
@@ -22,57 +13,97 @@ interface Props {
   onPulled: (hero: Hero) => void
 }
 
-export default function MintButton({ onPulled }: Props) {
-  const [hero, setHero] = useState<Hero | null>(null)
-
-  const { isConnected, address, chainId } = useAccount()
-  const { connect, connectors, isPending: connectPending } = useConnect()
-  const { disconnect } = useDisconnect()
-  const { switchChain, isPending: switchPending } = useSwitchChain()
-
-  const {
-    writeContract,
-    data: txHash,
-    isPending: txPending,
-    error: txError,
-  } = useWriteContract()
-
-  const { isLoading: confirming, isSuccess: confirmed } =
-    useWaitForTransactionReceipt({
-      hash: txHash,
-      chainId: base.id,
-    })
-
-  const injectedConnector = useMemo(
-    () => connectors.find((c) => c.type === "injected") ?? connectors[0],
-    [connectors]
-  )
-
-  const handleMint = () => {
-    const newHero = generateHero()
-    setHero(newHero)
-    onPulled(newHero)
-
-    if (!isConnected) {
-      if (injectedConnector) connect({ connector: injectedConnector })
-      return
+declare global {
+  interface Window {
+    ethereum?: {
+      request: (args: { method: string; params?: any[] }) => Promise<any>
     }
-
-    if (chainId !== base.id) {
-      switchChain({ chainId: base.id })
-      return
-    }
-
-    writeContract({
-      chainId: base.id,
-      address: HERO_PULL_CONTRACT_ADDRESS,
-      abi: HERO_PULL_ABI,
-      functionName: "mint",
-      value: parseEther(HERO_PULL_MINT_PRICE_ETH),
-    })
   }
+}
 
-  const busy = connectPending || switchPending || txPending || confirming
+const publicClient = createPublicClient({
+  chain: base,
+  transport: http(),
+})
+
+export default function MintButton({ onPulled }: Props) {
+  const [busy, setBusy] = useState(false)
+  const [txHash, setTxHash] = useState<`0x${string}` | null>(null)
+  const [status, setStatus] = useState<string>("")
+  const [error, setError] = useState<string>("")
+
+  const handleMint = async () => {
+    setError("")
+    setStatus("")
+
+    const hero = generateHero()
+    onPulled(hero)
+
+    if (!window.ethereum) {
+      setError("No wallet found (install MetaMask/Coinbase Wallet).")
+      return
+    }
+
+    try {
+      setBusy(true)
+
+      // Connect
+      await window.ethereum.request({ method: "eth_requestAccounts" })
+
+      // Ensure Base mainnet
+      try {
+        await window.ethereum.request({
+          method: "wallet_switchEthereumChain",
+          params: [{ chainId: "0x2105" }],
+        })
+      } catch (e: any) {
+        // If chain not added, try add
+        if (e?.code === 4902) {
+          await window.ethereum.request({
+            method: "wallet_addEthereumChain",
+            params: [
+              {
+                chainId: "0x2105",
+                chainName: "Base",
+                nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+                rpcUrls: ["https://mainnet.base.org"],
+                blockExplorerUrls: ["https://basescan.org"],
+              },
+            ],
+          })
+        } else {
+          throw e
+        }
+      }
+
+      // Call contract mint() payable
+      // Function selector for mint(): 0x1249c58b
+      const data = "0x1249c58b"
+      const valueHex = `0x${parseEther(HERO_PULL_MINT_PRICE_ETH).toString(16)}`
+
+      setStatus("Opening wallet…")
+      const hash = await window.ethereum.request({
+        method: "eth_sendTransaction",
+        params: [
+          {
+            to: HERO_PULL_CONTRACT_ADDRESS,
+            data,
+            value: valueHex,
+          },
+        ],
+      })
+
+      setTxHash(hash)
+      setStatus("Confirming…")
+
+      await publicClient.waitForTransactionReceipt({ hash })
+      setStatus("Hero minted!")
+    } catch (err: any) {
+      setError(err?.message || String(err))
+    } finally {
+      setBusy(false)
+    }
+  }
 
   return (
     <div className="flex flex-col items-center gap-3">
@@ -81,38 +112,20 @@ export default function MintButton({ onPulled }: Props) {
         onClick={handleMint}
         className="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-black font-bold py-4 px-10 rounded-2xl shadow-lg text-lg transition-all disabled:opacity-60"
       >
-        {busy
-          ? "Opening wallet..."
-          : `Mint Hero (${HERO_PULL_MINT_PRICE_ETH} ETH)`}
+        {busy ? "Minting..." : `Mint Hero (${HERO_PULL_MINT_PRICE_ETH} ETH)`}
       </button>
 
-      {isConnected && (
-        <div className="text-xs text-gray-400 text-center">
-          <div>
-            Connected: <span className="font-mono">{address}</span>
-          </div>
-          <button
-            onClick={() => disconnect()}
-            className="underline text-gray-300 hover:text-white"
-          >
-            Disconnect
-          </button>
-        </div>
-      )}
-
       {txHash && (
-        <div className="text-xs text-gray-300 text-center">
-          Tx: <span className="font-mono">{txHash}</span>
+        <div className="text-xs text-gray-300 text-center break-all font-mono">
+          Tx: {txHash}
         </div>
       )}
 
-      {confirmed && hero && (
-        <div className="text-sm font-semibold text-green-400">Hero minted!</div>
-      )}
+      {status && <div className="text-sm font-semibold text-green-400">{status}</div>}
 
-      {txError && (
-        <div className="text-xs text-red-400 text-center">
-          {txError.message}
+      {error && (
+        <div className="text-xs text-red-400 text-center break-words max-w-sm">
+          {error}
         </div>
       )}
     </div>
