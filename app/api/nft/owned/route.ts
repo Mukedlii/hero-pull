@@ -1,0 +1,55 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { createPublicClient, http, parseAbi } from 'viem'
+import { base } from 'viem/chains'
+
+const CONTRACT = '0xA728A918A767bB085D4ac895b8F2d2AbD0dE27bB'
+
+// NOTE: for performance you should set this to the contract deploy block.
+const DEFAULT_LOOKBACK_BLOCKS = 200_000n
+
+const abi = parseAbi([
+  'event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)',
+])
+
+export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url)
+  const address = searchParams.get('address')
+
+  if (!address || !address.startsWith('0x') || address.length !== 42) {
+    return NextResponse.json({ error: 'missing/invalid address' }, { status: 400 })
+  }
+
+  const rpcUrl = process.env.BASE_RPC_URL || process.env.NEXT_PUBLIC_BASE_RPC_URL || 'https://mainnet.base.org'
+
+  const client = createPublicClient({
+    chain: base,
+    transport: http(rpcUrl),
+  })
+
+  const latest = await client.getBlockNumber()
+  const fromBlock = latest > DEFAULT_LOOKBACK_BLOCKS ? latest - DEFAULT_LOOKBACK_BLOCKS : 0n
+
+  // Fetch transfers TO address (mints + transfers)
+  const logs = await client.getLogs({
+    address: CONTRACT,
+    event: abi[0],
+    args: { to: address as `0x${string}` },
+    fromBlock,
+    toBlock: latest,
+  })
+
+  const tokenIds = logs
+    .map((l) => (l.args as any).tokenId as bigint)
+    .filter((x) => typeof x === 'bigint')
+
+  // De-dupe
+  const unique = Array.from(new Set(tokenIds.map((x) => x.toString()))).map((s) => BigInt(s))
+
+  return NextResponse.json({
+    contract: CONTRACT,
+    address,
+    fromBlock: fromBlock.toString(),
+    latest: latest.toString(),
+    tokenIds: unique.map((x) => x.toString()),
+  })
+}

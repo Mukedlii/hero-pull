@@ -20,6 +20,20 @@ export default function CollectionPage() {
     } catch {
       setCollection([])
     }
+
+    // Best-effort: if user has onchain NFTs, we can show tokenIds later.
+    // (Requires wallet address; Warpcast provider sometimes supports eth_accounts.)
+    ;(async () => {
+      try {
+        const provider: any = (await import("@farcaster/frame-sdk")).default?.wallet?.ethProvider
+        const accounts = provider ? await provider.request({ method: "eth_accounts" }) : []
+        const address = accounts?.[0]
+        if (!address) return
+        await fetch(`/api/nft/owned?address=${address}`)
+      } catch {
+        // ignore
+      }
+    })()
   }, [])
 
   const isEmpty = useMemo(() => !collection || collection.length === 0, [collection])
