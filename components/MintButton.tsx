@@ -1,8 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import { createPublicClient, http, parseEther } from "viem"
-import { base } from "viem/chains"
 import { generateHero, type Hero } from "@/lib/heroes"
 import {
   HERO_PULL_CONTRACT_ADDRESS,
@@ -21,14 +19,28 @@ declare global {
   }
 }
 
-const publicClient = createPublicClient({
-  chain: base,
-  transport: http(),
-})
+const BASE_CHAIN_ID_HEX = "0x2105" // 8453
+const MINT_SELECTOR = "0x1249c58b" // mint()
+
+// 0.00066 ETH = 660000000000000 wei
+const MINT_VALUE_WEI_HEX = "0x2588c3b42c000" as const
+
+async function waitForReceipt(hash: string, timeoutMs = 120_000) {
+  const start = Date.now()
+  while (Date.now() - start < timeoutMs) {
+    const receipt = await window.ethereum?.request({
+      method: "eth_getTransactionReceipt",
+      params: [hash],
+    })
+    if (receipt) return receipt
+    await new Promise((r) => setTimeout(r, 1500))
+  }
+  throw new Error("Timed out waiting for transaction confirmation")
+}
 
 export default function MintButton({ onPulled }: Props) {
   const [busy, setBusy] = useState(false)
-  const [txHash, setTxHash] = useState<`0x${string}` | null>(null)
+  const [txHash, setTxHash] = useState<string | null>(null)
   const [status, setStatus] = useState<string>("")
   const [error, setError] = useState<string>("")
 
@@ -54,16 +66,15 @@ export default function MintButton({ onPulled }: Props) {
       try {
         await window.ethereum.request({
           method: "wallet_switchEthereumChain",
-          params: [{ chainId: "0x2105" }],
+          params: [{ chainId: BASE_CHAIN_ID_HEX }],
         })
       } catch (e: any) {
-        // If chain not added, try add
         if (e?.code === 4902) {
           await window.ethereum.request({
             method: "wallet_addEthereumChain",
             params: [
               {
-                chainId: "0x2105",
+                chainId: BASE_CHAIN_ID_HEX,
                 chainName: "Base",
                 nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
                 rpcUrls: ["https://mainnet.base.org"],
@@ -76,19 +87,14 @@ export default function MintButton({ onPulled }: Props) {
         }
       }
 
-      // Call contract mint() payable
-      // Function selector for mint(): 0x1249c58b
-      const data = "0x1249c58b"
-      const valueHex = `0x${parseEther(HERO_PULL_MINT_PRICE_ETH).toString(16)}`
-
       setStatus("Opening wallet…")
       const hash = await window.ethereum.request({
         method: "eth_sendTransaction",
         params: [
           {
             to: HERO_PULL_CONTRACT_ADDRESS,
-            data,
-            value: valueHex,
+            data: MINT_SELECTOR,
+            value: MINT_VALUE_WEI_HEX,
           },
         ],
       })
@@ -96,7 +102,11 @@ export default function MintButton({ onPulled }: Props) {
       setTxHash(hash)
       setStatus("Confirming…")
 
-      await publicClient.waitForTransactionReceipt({ hash })
+      const receipt = await waitForReceipt(hash)
+      if (receipt?.status && receipt.status !== "0x1") {
+        throw new Error("Transaction failed")
+      }
+
       setStatus("Hero minted!")
     } catch (err: any) {
       setError(err?.message || String(err))
