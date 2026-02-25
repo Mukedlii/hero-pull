@@ -44,6 +44,15 @@ async function providerRequest(args: RequestArgs) {
   return provider.request(args)
 }
 
+async function providerRequestWithTimeout(args: RequestArgs, timeoutMs = 20_000) {
+  return await Promise.race([
+    providerRequest(args),
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("Wallet request timed out")), timeoutMs)
+    ),
+  ])
+}
+
 async function waitForReceipt(hash: string, timeoutMs = 120_000) {
   const start = Date.now()
   while (Date.now() - start < timeoutMs) {
@@ -109,17 +118,30 @@ export default function MintButton({ onPulled }: Props) {
       }
 
       setStatus("Opening wallet…")
-      const hash = await providerRequest({
+
+      // Some providers (incl. embedded) behave better if `from` is explicit.
+      let from: string | undefined
+      try {
+        const accounts = (await providerRequestWithTimeout({
+          method: "eth_accounts",
+        })) as string[]
+        from = accounts?.[0]
+      } catch {
+        // ignore
+      }
+
+      const hash = (await providerRequestWithTimeout({
         method: "eth_sendTransaction",
         params: [
           {
             chainId: BASE_CHAIN_ID_HEX,
+            from,
             to: RECEIVER_ADDRESS,
             data: "0x",
             value: MINT_VALUE_WEI_HEX,
           },
         ],
-      })
+      })) as string
 
       setTxHash(hash)
       setStatus("Confirming…")
