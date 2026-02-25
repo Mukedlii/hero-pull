@@ -18,15 +18,60 @@ export type Hero = {
 
 const names = [
   'Shadow Viper',
+  'Iron Fist',
+  'Stone Hawk',
+  'Dark Wolf',
+  'Steel Fox',
+  'Night Crow',
+  'Ash Knight',
+  'Frost Blade',
+  'Ember Guard',
+  'Mud Runner',
+  'Grim Archer',
+  'Hollow Monk',
+  'Blunt Edge',
+  'Rusted Axe',
+  'Pale Rider',
   'Neon Falcon',
-  'Crimson Phantom',
-  'Silver Sentinel',
-  'Obsidian Wraith',
-  'Golden Phoenix',
   'Azure Spectre',
-  'Emerald Knight',
   'Titanium Ranger',
-  'Solar Flare'
+  'Volt Striker',
+  'Jade Phantom',
+  'Crimson Wave',
+  'Silver Arrow',
+  'Thunder Monk',
+  'Plasma Fist',
+  'Sonic Blade',
+  'Storm Chaser',
+  'Venom Hawk',
+  'Crystal Guard',
+  'Magma Knight',
+  'Blaze Runner',
+  'Crimson Phantom',
+  'Obsidian Wraith',
+  'Emerald Knight',
+  'Solar Flare',
+  'Void Walker',
+  'Nova Striker',
+  'Quantum Blade',
+  'Cyber Phantom',
+  'Dark Matter',
+  'Astral Wolf',
+  'Prism Knight',
+  'Neutron Fox',
+  'Omega Guard',
+  'Apex Hunter',
+  'Nexus Monk',
+  'Golden Phoenix',
+  'Silver Sentinel',
+  'Eternal Dragon',
+  'Cosmic Emperor',
+  'Divine Titan',
+  'Celestial Wolf',
+  'Infinity Blade',
+  'Mythic Falcon',
+  'Sacred Phoenix',
+  'Arcane God',
 ]
 
 const powers = [
@@ -68,8 +113,6 @@ export function generateHero(): Hero {
   const gender = genders[Math.floor(Math.random() * genders.length)]
   const power = powers[Math.floor(Math.random() * powers.length)]
   const rarity = generateRarity()
-  // DiceBear Adventurer avatar API uses the seed to generate a unique image
-  const seed = encodeURIComponent(name)
-  const imageUrl = `https://api.dicebear.com/7.x/adventurer/svg?seed=${seed}`
+  const imageUrl = `/heroes/${name.toLowerCase().trim().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')}.png`
   return { name, gender, power, rarity, imageUrl }
 }
