@@ -39,13 +39,29 @@ export default function BattlePage() {
 
   const shareText = useMemo(() => {
     if (!hero || !opponent || !winner) return ""
-    const result = winner === "hero" ? "Victory" : "Defeat"
-    return `Hero Pull Battle: ${result}!\n\n${hero.name} vs ${opponent.name}\n\nPlay here 👇`
+
+    const frameUrl = "https://hero-pull.vercel.app"
+
+    if (winner === "hero") {
+      return `omg én nyertem, úgy sem tudtok legyőzni 😎😂🤣😜✨\n\n${hero.name} DESTROYED ${opponent.name} ⚔️\n\nGyere te is: ${frameUrl}`
+    }
+
+    return `Gyertek segíteni legyőzni ${opponent.name}-t!! 😭🙏⚔️\n\nÉn kikaptam vele…\n\nFrame: ${frameUrl}`
   }, [hero, opponent, winner])
 
-  const handleShare = () => {
+  const handleShare = async () => {
     const frameUrl = "https://hero-pull.vercel.app"
     const url = `https://warpcast.com/~/compose?text=${encodeURIComponent(shareText)}&embeds[]=${encodeURIComponent(frameUrl)}`
+
+    // In Warpcast, prefer SDK openUrl so it opens in-app (otherwise iOS may show Farcaster download page)
+    try {
+      const { sdk } = await import("@farcaster/frame-sdk")
+      await sdk.actions.openUrl(url)
+      return
+    } catch {
+      // fallback
+    }
+
     window.open(url, "_blank")
   }
 
