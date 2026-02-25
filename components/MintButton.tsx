@@ -7,14 +7,16 @@ import {
   useAccount,
   useConnect,
   useDisconnect,
-  useSendTransaction,
   useSwitchChain,
   useWaitForTransactionReceipt,
+  useWriteContract,
 } from "wagmi"
 import { generateHero, type Hero } from "@/lib/heroes"
-
-const RECEIVER = "0xa782922Ff9c54F4264FD049189eC66940f528Eb0" as const
-const AMOUNT_ETH = "0.00066" as const
+import {
+  HERO_PULL_ABI,
+  HERO_PULL_CONTRACT_ADDRESS,
+  HERO_PULL_MINT_PRICE_ETH,
+} from "@/lib/heroPullContract"
 
 interface Props {
   onPulled: (hero: Hero) => void
@@ -29,11 +31,11 @@ export default function MintButton({ onPulled }: Props) {
   const { switchChain, isPending: switchPending } = useSwitchChain()
 
   const {
-    sendTransaction,
+    writeContract,
     data: txHash,
     isPending: txPending,
     error: txError,
-  } = useSendTransaction()
+  } = useWriteContract()
 
   const { isLoading: confirming, isSuccess: confirmed } =
     useWaitForTransactionReceipt({
@@ -46,7 +48,7 @@ export default function MintButton({ onPulled }: Props) {
     [connectors]
   )
 
-  const handleMint = async () => {
+  const handleMint = () => {
     const newHero = generateHero()
     setHero(newHero)
     onPulled(newHero)
@@ -61,10 +63,12 @@ export default function MintButton({ onPulled }: Props) {
       return
     }
 
-    sendTransaction({
+    writeContract({
       chainId: base.id,
-      to: RECEIVER,
-      value: parseEther(AMOUNT_ETH),
+      address: HERO_PULL_CONTRACT_ADDRESS,
+      abi: HERO_PULL_ABI,
+      functionName: "mint",
+      value: parseEther(HERO_PULL_MINT_PRICE_ETH),
     })
   }
 
@@ -77,7 +81,9 @@ export default function MintButton({ onPulled }: Props) {
         onClick={handleMint}
         className="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-black font-bold py-4 px-10 rounded-2xl shadow-lg text-lg transition-all disabled:opacity-60"
       >
-        {busy ? "Opening wallet..." : `Mint Hero (${AMOUNT_ETH} ETH)`}
+        {busy
+          ? "Opening wallet..."
+          : `Mint Hero (${HERO_PULL_MINT_PRICE_ETH} ETH)`}
       </button>
 
       {isConnected && (
@@ -108,12 +114,6 @@ export default function MintButton({ onPulled }: Props) {
         <div className="text-xs text-red-400 text-center">
           {txError.message}
         </div>
-      )}
-
-      {!isConnected && (
-        <p className="text-xs text-gray-500 text-center">
-          This will open your wallet (Base mainnet) to send payment.
-        </p>
       )}
     </div>
   )
