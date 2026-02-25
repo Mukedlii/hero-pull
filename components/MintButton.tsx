@@ -20,7 +20,9 @@ declare global {
 }
 
 const BASE_CHAIN_ID_HEX = "0x2105" // 8453
-const RECEIVER_ADDRESS = "0xa782922Ff9c54F4264FD049189eC66940f528Eb0" as const
+import { HERO_PULL_CONTRACT_ADDRESS } from "@/lib/heroPullContract"
+
+const MINT_SELECTOR = "0x1249c58b" as const // mint()
 
 // 0.00020 ETH = 200000000000000 wei
 const MINT_VALUE_WEI_HEX = "0xB5E620F48000" as const
@@ -120,8 +122,8 @@ export default function MintButton({ onPulled }: Props) {
           {
             chainId: BASE_CHAIN_ID_HEX,
             from,
-            to: RECEIVER_ADDRESS,
-            data: "0x",
+            to: HERO_PULL_CONTRACT_ADDRESS,
+            data: MINT_SELECTOR,
             value: MINT_VALUE_WEI_HEX,
           },
         ],

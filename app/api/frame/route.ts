@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 const CHAIN_ID = 'eip155:8453' // Base mainnet
-const RECEIVER = '0xa782922Ff9c54F4264FD049189eC66940f528Eb0'
-const VALUE_WEI_HEX = '0x2588c3b42c000' // 0.00066 ETH = 660000000000000 wei
+const CONTRACT = '0xA728A918A767bB085D4ac895b8F2d2AbD0dE27bB'
+const VALUE_WEI_HEX = '0xB5E620F48000' // 0.00020 ETH = 200000000000000 wei
+const MINT_SELECTOR = '0x1249c58b' // mint()
 
 /**
  * Frame route for Farcaster.
@@ -51,8 +52,8 @@ export async function POST(req: NextRequest) {
     method: 'eth_sendTransaction',
     params: {
       abi: [],
-      to: RECEIVER,
-      data: '0x',
+      to: CONTRACT,
+      data: MINT_SELECTOR,
       value: VALUE_WEI_HEX,
     },
   })
