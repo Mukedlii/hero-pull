@@ -14,6 +14,7 @@ export default function CollectionPage() {
   const [collection, setCollection] = useState<Hero[]>([])
   const [walletAddress, setWalletAddress] = useState<string | null>(null)
   const [onchainTokenIds, setOnchainTokenIds] = useState<string[]>([])
+  const [onchainHeroes, setOnchainHeroes] = useState<Record<string, Hero>>({})
   const [loadingOnchain, setLoadingOnchain] = useState(false)
 
   useEffect(() => {
@@ -39,7 +40,26 @@ export default function CollectionPage() {
         setWalletAddress(addr)
         const res = await fetch(`/api/nft/owned?address=${addr}`, { cache: "no-store" })
         const json = await res.json()
-        setOnchainTokenIds(Array.isArray(json?.tokenIds) ? json.tokenIds : [])
+        const ids: string[] = Array.isArray(json?.tokenIds) ? json.tokenIds : []
+        setOnchainTokenIds(ids)
+
+        // Fetch deterministic hero metadata per tokenId
+        const entries = await Promise.all(
+          ids.map(async (id: string) => {
+            try {
+              const r = await fetch(`/api/nft/hero/${id}`, { cache: "no-store" })
+              const j = await r.json()
+              return [id, j?.hero as Hero] as const
+            } catch {
+              return [id, null] as const
+            }
+          })
+        )
+        const map: Record<string, Hero> = {}
+        for (const [id, h] of entries) {
+          if (h) map[id] = h
+        }
+        setOnchainHeroes(map)
       } catch {
         // ignore
       } finally {
@@ -92,8 +112,47 @@ export default function CollectionPage() {
 
       {hasOnchain && (
         <div className="mt-4 p-3 rounded-xl border border-gray-700 bg-gray-900">
-          <p className="text-sm font-bold">Onchain NFTs (restored)</p>
+          <p className="text-sm font-bold">Onchain Heroes (restored)</p>
           <p className="text-xs text-gray-400 mt-1">Token IDs: {onchainTokenIds.join(", ")}</p>
+
+          <div className="grid grid-cols-2 gap-3 mt-4">
+            {onchainTokenIds.map((id) => {
+              const h = onchainHeroes[id]
+              if (!h) {
+                return (
+                  <div key={id} className="border border-gray-700 rounded-xl p-3 bg-black/30">
+                    <p className="text-xs text-gray-400">#{id}</p>
+                    <p className="text-sm">Loading…</p>
+                  </div>
+                )
+              }
+
+              return (
+                <div
+                  key={id}
+                  className={`border-2 rounded-xl p-3 flex flex-col items-center gap-2 bg-gray-900 ${rarityBorder[h.rarity]}`}
+                >
+                  <img src={h.imageUrl} className="w-20 h-20 rounded-xl object-cover" alt={h.name} />
+                  <p className="font-bold text-sm text-center leading-tight">
+                    {h.name} <span className="text-gray-400">#{id}</span>
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    {h.rarity} • Lv.{h.level}
+                  </p>
+                  <p className="text-xs">
+                    ATK:{h.attack} DEF:{h.defense} SPD:{h.speed}
+                  </p>
+                  <a
+                    href={`https://basescan.org/token/0xA728A918A767bB085D4ac895b8F2d2AbD0dE27bB?a=${id}`}
+                    target="_blank"
+                    className="text-xs text-blue-300 underline"
+                  >
+                    View on BaseScan
+                  </a>
+                </div>
+              )
+            })}
+          </div>
         </div>
       )}
 
