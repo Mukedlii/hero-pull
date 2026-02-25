@@ -16,7 +16,7 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "jsx": "preserve",
-    "target": "es2017",
+    "target": "es2020",
     "downlevelIteration": true,
     "plugins": [
       {
