@@ -1,22 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
 
+const CHAIN_ID = 'eip155:8453' // Base mainnet
+const RECEIVER = '0xa782922Ff9c54F4264FD049189eC66940f528Eb0'
+const VALUE_WEI_HEX = '0x177C2B900' // 0.00066 ETH = 660000000000000 wei
+
 /**
- * Frame route for Farcaster. When Warpcast fetches this endpoint it
- * returns metadata instructing the client how to render the initial
- * frame card in the social feed. This includes a preview image and
- * a button that launches the full mini app.
+ * Frame route for Farcaster.
+ * - GET: frame metadata for Warpcast to render the initial card.
+ * - POST: Frame v2 transaction response (Warpcast built-in wallet signs).
  */
 export async function GET(_req: NextRequest) {
   const baseUrl = process.env.VERCEL_URL
     ? `https://${process.env.VERCEL_URL}`
     : 'http://localhost:3000'
+
   const imageUrl = `${baseUrl}/api/og-image`
+
   return NextResponse.json({
     frame: {
       version: 'vNext',
       name: 'Hero Pull',
-      // Default preview image for the feed card. You can customise this
-      // further by creating an API route that generates an image on the fly.
       imageUrl,
       button: {
         title: 'Pull a Hero',
@@ -28,6 +31,29 @@ export async function GET(_req: NextRequest) {
           splashBackgroundColor: '#000000',
         },
       },
+    },
+  })
+}
+
+export async function POST(req: NextRequest) {
+  // Warpcast sends a JSON body for frame actions; we don't need it yet,
+  // but parsing keeps this endpoint compatible with typical frame POSTs.
+  try {
+    await req.json()
+  } catch {
+    // ignore
+  }
+
+  // Farcaster Frame v2 native tx response (Warpcast built-in wallet)
+  return NextResponse.json({
+    type: 'tx',
+    chainId: CHAIN_ID,
+    method: 'eth_sendTransaction',
+    params: {
+      abi: [],
+      to: RECEIVER,
+      data: '0x',
+      value: VALUE_WEI_HEX,
     },
   })
 }
