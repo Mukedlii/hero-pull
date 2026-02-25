@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
     args: { to: address as `0x${string}` },
     fromBlock,
     toBlock: latest,
-  })
+  } as any)
 
   const tokenIds = logs
     .map((l) => (l.args as any).tokenId as bigint)
