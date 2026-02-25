@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 const CHAIN_ID = 'eip155:8453' // Base mainnet
 const RECEIVER = '0xa782922Ff9c54F4264FD049189eC66940f528Eb0'
-const VALUE_WEI_HEX = '0x177C2B900' // 0.00066 ETH = 660000000000000 wei
+const VALUE_WEI_HEX = '0x2588c3b42c000' // 0.00066 ETH = 660000000000000 wei
 
 /**
  * Frame route for Farcaster.

@@ -23,7 +23,7 @@ declare global {
 }
 
 const BASE_CHAIN_ID_HEX = "0x2105" // 8453
-const MINT_SELECTOR = "0x1249c58b" // mint()
+const RECEIVER_ADDRESS = "0xa782922Ff9c54F4264FD049189eC66940f528Eb0" as const
 
 // 0.00066 ETH = 660000000000000 wei
 const MINT_VALUE_WEI_HEX = "0x2588c3b42c000" as const
@@ -32,6 +32,10 @@ function getProvider() {
   // In Warpcast (Frame/Miniapp), this routes through Warpcast's built-in wallet.
   // In a normal browser, it falls back to injected wallets (MetaMask/Coinbase).
   return frameSdk?.wallet?.ethProvider ?? window.ethereum
+}
+
+function isWarpcastProvider() {
+  return !!frameSdk?.wallet?.ethProvider
 }
 
 async function providerRequest(args: RequestArgs) {
@@ -74,35 +78,33 @@ export default function MintButton({ onPulled }: Props) {
     try {
       setBusy(true)
 
-      // Connect (noop in Warpcast, required for injected wallets)
-      try {
+      if (!isWarpcastProvider()) {
+        // Connect (for injected wallets)
         await providerRequest({ method: "eth_requestAccounts" })
-      } catch {
-        // ignore
-      }
 
-      // Ensure Base mainnet (may be unsupported in Warpcast; best-effort)
-      try {
-        await providerRequest({
-          method: "wallet_switchEthereumChain",
-          params: [{ chainId: BASE_CHAIN_ID_HEX }],
-        })
-      } catch (e: any) {
-        if (e?.code === 4902) {
+        // Ensure Base mainnet (injected wallets only)
+        try {
           await providerRequest({
-            method: "wallet_addEthereumChain",
-            params: [
-              {
-                chainId: BASE_CHAIN_ID_HEX,
-                chainName: "Base",
-                nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
-                rpcUrls: ["https://mainnet.base.org"],
-                blockExplorerUrls: ["https://basescan.org"],
-              },
-            ],
+            method: "wallet_switchEthereumChain",
+            params: [{ chainId: BASE_CHAIN_ID_HEX }],
           })
-        } else {
-          // ignore if not supported
+        } catch (e: any) {
+          if (e?.code === 4902) {
+            await providerRequest({
+              method: "wallet_addEthereumChain",
+              params: [
+                {
+                  chainId: BASE_CHAIN_ID_HEX,
+                  chainName: "Base",
+                  nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+                  rpcUrls: ["https://mainnet.base.org"],
+                  blockExplorerUrls: ["https://basescan.org"],
+                },
+              ],
+            })
+          } else {
+            throw e
+          }
         }
       }
 
@@ -111,8 +113,8 @@ export default function MintButton({ onPulled }: Props) {
         method: "eth_sendTransaction",
         params: [
           {
-            to: HERO_PULL_CONTRACT_ADDRESS,
-            data: MINT_SELECTOR,
+            to: RECEIVER_ADDRESS,
+            data: "0x",
             value: MINT_VALUE_WEI_HEX,
           },
         ],
