@@ -75,17 +75,19 @@ export default function HeroPull() {
       </div>
 
       {!hero && (
-        <button
-          onClick={handlePull}
-          disabled={isRevealing}
-          className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold py-4 px-10 rounded-2xl shadow-lg text-lg transition-all disabled:opacity-60"
-        >
-          {isRevealing
-            ? 'Revealing...'
-            : isFreeAvailable
-              ? 'Pull Hero (FREE)'
-              : 'Pull Hero'}
-        </button>
+        <>
+          {isFreeAvailable ? (
+            <button
+              onClick={handlePull}
+              disabled={isRevealing}
+              className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold py-4 px-10 rounded-2xl shadow-lg text-lg transition-all disabled:opacity-60"
+            >
+              {isRevealing ? 'Revealing...' : 'Pull Hero (FREE)'}
+            </button>
+          ) : (
+            <MintButton onPulled={(h) => setHero(h)} />
+          )}
+        </>
       )}
 
       {isRevealing && <div className="text-4xl animate-bounce">🎴</div>}
