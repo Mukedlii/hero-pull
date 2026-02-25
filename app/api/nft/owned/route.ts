@@ -13,70 +13,75 @@ const abi = parseAbi([
 ])
 
 export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url)
-  const address = searchParams.get('address')
+  try {
+    const { searchParams } = new URL(req.url)
+    const address = searchParams.get('address')
 
-  if (!address || !address.startsWith('0x') || address.length !== 42) {
-    return NextResponse.json({ error: 'missing/invalid address' }, { status: 400 })
-  }
-
-  const rpcUrl = process.env.BASE_RPC_URL || process.env.NEXT_PUBLIC_BASE_RPC_URL || 'https://mainnet.base.org'
-
-  const client = createPublicClient({
-    chain: base,
-    transport: http(rpcUrl),
-  })
-
-  const latest = await client.getBlockNumber()
-  const fromBlock = latest > DEFAULT_LOOKBACK_BLOCKS ? latest - DEFAULT_LOOKBACK_BLOCKS : 0n
-
-  // Fetch transfers TO address (mints + transfers)
-  const logs = await client.getLogs({
-    address: CONTRACT,
-    event: abi[0],
-    args: { to: address as `0x${string}` },
-    fromBlock,
-    toBlock: latest,
-  } as any)
-
-  // When typings aren't inferred, `getLogs()` returns raw logs without `args`.
-  // Transfer has indexed tokenId as topic[3].
-  const tokenIds = (logs as any[])
-    .map((l) => {
-      const t = l?.topics?.[3]
-      if (!t) return null
-      try {
-        return BigInt(t)
-      } catch {
-        return null
-      }
-    })
-    .filter((x): x is bigint => typeof x === 'bigint')
-
-  // De-dupe
-  const unique = Array.from(new Set(tokenIds.map((x) => x.toString()))).map((s) => BigInt(s))
-
-  // Keep only tokens still owned by address (handles transfers out)
-  const owned: bigint[] = []
-  for (const id of unique) {
-    try {
-      const owner = await (client as any).readContract({
-        address: CONTRACT,
-        abi,
-        functionName: 'ownerOf',
-        args: [id],
-      })
-      if (String(owner).toLowerCase() === address.toLowerCase()) owned.push(id)
-    } catch {
-      // ignore (non-ERC721 or RPC hiccup)
+    if (!address || !address.startsWith('0x') || address.length !== 42) {
+      return NextResponse.json({ error: 'missing/invalid address' }, { status: 400 })
     }
-  }
 
-  return NextResponse.json({
-    contract: CONTRACT,
-    address,
-    fromBlock: fromBlock.toString(),
-    latest: latest.toString(),
-    tokenIds: owned.map((x) => x.toString()),
-  })
+    const rpcUrl = process.env.BASE_RPC_URL || process.env.NEXT_PUBLIC_BASE_RPC_URL || 'https://mainnet.base.org'
+
+    const client = createPublicClient({
+      chain: base,
+      transport: http(rpcUrl),
+    })
+
+    const latest = await client.getBlockNumber()
+    const fromBlock = latest > DEFAULT_LOOKBACK_BLOCKS ? latest - DEFAULT_LOOKBACK_BLOCKS : 0n
+
+    // Fetch Transfer logs TO address using topics (more robust than typed args on Vercel).
+    const transferTopic =
+      '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef'
+    const toTopic = ('0x' + address.toLowerCase().slice(2).padStart(64, '0')) as `0x${string}`
+
+    const logs = await client.getLogs({
+      address: CONTRACT,
+      fromBlock,
+      toBlock: latest,
+      topics: [transferTopic, null, toTopic],
+    } as any)
+
+    const tokenIds = (logs as any[])
+      .map((l) => {
+        const t = l?.topics?.[3]
+        if (!t) return null
+        try {
+          return BigInt(t)
+        } catch {
+          return null
+        }
+      })
+      .filter((x): x is bigint => typeof x === 'bigint')
+
+    // De-dupe
+    const unique = Array.from(new Set(tokenIds.map((x) => x.toString()))).map((s) => BigInt(s))
+
+    // Keep only tokens still owned by address (handles transfers out)
+    const owned: bigint[] = []
+    for (const id of unique) {
+      try {
+        const owner = await (client as any).readContract({
+          address: CONTRACT,
+          abi,
+          functionName: 'ownerOf',
+          args: [id],
+        })
+        if (String(owner).toLowerCase() === address.toLowerCase()) owned.push(id)
+      } catch {
+        // ignore
+      }
+    }
+
+    return NextResponse.json({
+      contract: CONTRACT,
+      address,
+      fromBlock: fromBlock.toString(),
+      latest: latest.toString(),
+      tokenIds: owned.map((x) => x.toString()),
+    })
+  } catch (e: any) {
+    return NextResponse.json({ error: String(e?.message || e) }, { status: 500 })
+  }
 }
