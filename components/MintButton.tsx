@@ -130,6 +130,17 @@ export default function MintButton({ onPulled }: Props) {
       setTxHash(hash)
       setStatus("Confirming…")
 
+      // Save minted hero locally (acts as the user's collection/NFT list for now)
+      try {
+        const raw = localStorage.getItem("hero-pull-collection")
+        const collection = raw ? (JSON.parse(raw) as Hero[]) : []
+        collection.unshift(hero)
+        localStorage.setItem("hero-pull-collection", JSON.stringify(collection))
+        localStorage.setItem("hero-pull-current-hero", JSON.stringify(hero))
+      } catch {
+        // ignore
+      }
+
       // No confirmation/receipt polling (Warpcast provider doesn't support it reliably).
       await new Promise((r) => setTimeout(r, 2000))
       setStatus("Minted!")

@@ -31,6 +31,18 @@ export default function HeroPull() {
     const newHero = generateHero()
     setHero(newHero)
     setHasShared(false)
+
+    // Save pulled hero to local collection
+    try {
+      const raw = localStorage.getItem('hero-pull-collection')
+      const collection = raw ? (JSON.parse(raw) as Hero[]) : []
+      collection.unshift(newHero)
+      localStorage.setItem('hero-pull-collection', JSON.stringify(collection))
+      localStorage.setItem('hero-pull-current-hero', JSON.stringify(newHero))
+    } catch {
+      // ignore
+    }
+
     const today = new Date().toDateString()
     localStorage.setItem('hero-pull-last-free', today)
     setFreeAvailable(false)
