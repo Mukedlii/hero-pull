@@ -22,8 +22,8 @@ declare global {
 const BASE_CHAIN_ID_HEX = "0x2105" // 8453
 const RECEIVER_ADDRESS = "0xa782922Ff9c54F4264FD049189eC66940f528Eb0" as const
 
-// 0.00066 ETH = 660000000000000 wei
-const MINT_VALUE_WEI_HEX = "0x2588c3b42c000" as const
+// 0.00020 ETH = 200000000000000 wei
+const MINT_VALUE_WEI_HEX = "0xB5E620F48000" as const
 
 function getProvider() {
   // In Warpcast (Frame/Miniapp), this routes through Warpcast's built-in wallet.

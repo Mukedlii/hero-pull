@@ -12,4 +12,4 @@ export const HERO_PULL_ABI = [
   },
 ] as const
 
-export const HERO_PULL_MINT_PRICE_ETH = "0.00066" as const
+export const HERO_PULL_MINT_PRICE_ETH = "0.00020" as const

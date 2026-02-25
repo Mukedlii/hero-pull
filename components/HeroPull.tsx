@@ -133,7 +133,7 @@ export default function HeroPull() {
 
       {hero && !isFreeAvailable && (
         <p className="text-gray-500 text-xs text-center">
-          Free pull resets daily. Extra pulls cost 0.00066 ETH
+          Free pull resets daily. Extra pulls cost 0.00020 ETH
         </p>
       )}
     </div>
