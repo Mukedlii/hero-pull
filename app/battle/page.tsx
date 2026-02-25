@@ -37,7 +37,16 @@ export default function BattlePage() {
       setWinner(w)
 
       // Points: Victory +5, Defeat -4 (clamped at 0)
-      awardBattlePoints({ battleId: id, delta: w === "hero" ? 5 : -4 }).catch(() => {})
+      ;(async () => {
+        try {
+          const { sdk } = await import("@farcaster/frame-sdk")
+          const ctx: any = await sdk.context
+          const fid = ctx?.user?.fid
+          await awardBattlePoints({ battleId: id, delta: w === "hero" ? 5 : -4, fid }).catch(() => {})
+        } catch {
+          await awardBattlePoints({ battleId: id, delta: w === "hero" ? 5 : -4 }).catch(() => {})
+        }
+      })()
     }, 900)
   }
 

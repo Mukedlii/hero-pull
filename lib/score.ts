@@ -64,8 +64,8 @@ export async function writeScore(score: number) {
   return next
 }
 
-export async function awardBattlePoints(opts: { battleId: string; delta: number }) {
-  const { battleId, delta } = opts
+export async function awardBattlePoints(opts: { battleId: string; delta: number; fid?: number }) {
+  const { battleId, delta, fid } = opts
 
   // Anti-spam: only award once per battle id + simple cooldown.
   const lastBattleId = localStorage.getItem(LAST_AWARDED_BATTLE_KEY)
@@ -83,6 +83,15 @@ export async function awardBattlePoints(opts: { battleId: string; delta: number 
   const current = await readScore()
   const next = clampScore(current + delta)
   await writeScore(next)
+
+  // Best-effort persist to server (Supabase) if fid is known.
+  if (fid) {
+    fetch('/api/score/add', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ fid, delta, action: 'battle', ref: battleId }),
+    }).catch(() => {})
+  }
 
   localStorage.setItem(LAST_AWARDED_BATTLE_KEY, battleId)
   localStorage.setItem(LAST_AWARDED_AT_KEY, String(now))

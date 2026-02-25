@@ -3,14 +3,8 @@ import { hasRecentShare } from '@/lib/neynar'
 
 type Action = 'share' | 'battle' | 'merge'
 
-// Ephemeral in-memory store (good enough for testing; replace with KV/Supabase later)
-function getStore() {
-  const g = globalThis as any
-  if (!g.__HERO_PULL_STORE) {
-    g.__HERO_PULL_STORE = { scores: new Map<string, number>(), seen: new Set<string>() }
-  }
-  return g.__HERO_PULL_STORE as { scores: Map<string, number>; seen: Set<string> }
-}
+// NOTE: This endpoint is kept for prototype events (e.g. share verification).
+// Scores are now persisted via /api/score/add (Supabase).
 
 export async function POST(req: NextRequest) {
   let body: any
@@ -31,17 +25,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'missing action' }, { status: 400 })
   }
 
-  const store = getStore()
-  const key = `fid:${fid}`
   const now = Date.now()
 
-  // idempotency: same castHash counted once
+  // idempotency: same castHash counted once (in-memory only; good enough for now)
+  const g = globalThis as any
+  g.__HERO_PULL_SEEN ||= new Set<string>()
+  const seen: Set<string> = g.__HERO_PULL_SEEN
   if (castHash) {
     const seenKey = `${action}:${castHash}`
-    if (store.seen.has(seenKey)) {
-      return NextResponse.json({ ok: true, deduped: true, score: store.scores.get(key) ?? 0 })
+    if (seen.has(seenKey)) {
+      return NextResponse.json({ ok: true, deduped: true })
     }
-    store.seen.add(seenKey)
+    seen.add(seenKey)
   }
 
   let delta = 0
@@ -67,9 +62,5 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const current = store.scores.get(key) ?? 0
-  const next = Math.max(0, current + delta)
-  store.scores.set(key, next)
-
-  return NextResponse.json({ ok: true, fid, action, delta, verified, score: next })
+  return NextResponse.json({ ok: true, fid, action, delta, verified })
 }
