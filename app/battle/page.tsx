@@ -3,11 +3,13 @@
 import { useEffect, useMemo, useState } from "react"
 import BattleArena from "@/components/BattleArena"
 import { generateHero, type Hero } from "@/lib/heroes"
+import { awardBattlePoints } from "@/lib/score"
 
 export default function BattlePage() {
   const [hero, setHero] = useState<Hero | null>(null)
   const [opponent, setOpponent] = useState<Hero | null>(null)
   const [winner, setWinner] = useState<"hero" | "opponent" | null>(null)
+  const [battleId, setBattleId] = useState<string>("")
 
   useEffect(() => {
     try {
@@ -21,6 +23,9 @@ export default function BattlePage() {
   const rollBattle = () => {
     if (!hero) return
 
+    const id = globalThis.crypto?.randomUUID?.() ?? String(Date.now())
+    setBattleId(id)
+
     const o = generateHero()
     setOpponent(o)
     setWinner(null)
@@ -28,7 +33,11 @@ export default function BattlePage() {
     setTimeout(() => {
       const heroScore = hero.attack + hero.defense + hero.speed
       const oppScore = o.attack + o.defense + o.speed
-      setWinner(heroScore >= oppScore ? "hero" : "opponent")
+      const w = heroScore >= oppScore ? "hero" : "opponent"
+      setWinner(w)
+
+      // Points: Victory +5, Defeat -4 (clamped at 0)
+      awardBattlePoints({ battleId: id, delta: w === "hero" ? 5 : -4 }).catch(() => {})
     }, 900)
   }
 
