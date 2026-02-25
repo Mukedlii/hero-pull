@@ -14,7 +14,7 @@ export async function GET(_req: NextRequest) {
     ? `https://${process.env.VERCEL_URL}`
     : 'http://localhost:3000'
 
-  const imageUrl = `${baseUrl}/og.png`
+  const imageUrl = `${baseUrl}/frame.png`
 
   return NextResponse.json({
     frame: {
