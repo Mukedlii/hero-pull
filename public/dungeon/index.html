@@ -271,22 +271,25 @@ function hpFromStats(atk,def){
 
 async function openMint(){
   const frameUrl='https://hero-pull.vercel.app';
+  // Launch frame inside Warpcast (avoids Safari)
+  const launchUrl = `https://warpcast.com/~/frames/launch?url=${encodeURIComponent(frameUrl)}`;
   try{
     const mod = await import('https://esm.sh/@farcaster/frame-sdk');
     const sdk = mod?.default || mod?.sdk;
     if(sdk?.actions?.openUrl){
-      await sdk.actions.openUrl(frameUrl);
+      await sdk.actions.openUrl(launchUrl);
       return;
     }
   }catch{}
-  // fallback
-  window.open(frameUrl,'_blank');
+  window.location.href = launchUrl;
 }
 
 async function getWalletAddress(){
   try{
     const p = await getEthProvider();
     if(!p) return null;
+    // ensure connected in Warpcast
+    try{ await p.request({ method:'eth_requestAccounts' }); }catch{}
     const accounts = await p.request({ method:'eth_accounts' });
     return accounts && accounts[0] ? accounts[0] : null;
   }catch{ return null; }
