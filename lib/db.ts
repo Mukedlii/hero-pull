@@ -1,16 +1,31 @@
-import frameSdk from "@farcaster/frame-sdk"
-import { supabase } from "./supabase"
 import type { Hero, EquippedWeapon } from "./heroes"
 import type { Weapon } from "./weapons"
+import { supabase } from "./supabase"
 
 type RequestArgs = { method: string; params?: any[] }
 
-function getProvider() {
-  return (frameSdk as any)?.wallet?.ethProvider ?? (globalThis as any)?.window?.ethereum
+type Provider = {
+  request: (args: RequestArgs) => Promise<any>
+}
+
+async function getProvider(): Promise<Provider | null> {
+  if (typeof window === "undefined") return null
+
+  try {
+    const mod: any = await import("@farcaster/frame-sdk")
+    return (
+      mod?.default?.wallet?.ethProvider ??
+      mod?.sdk?.wallet?.ethProvider ??
+      (window as any).ethereum ??
+      null
+    )
+  } catch {
+    return (window as any).ethereum ?? null
+  }
 }
 
 async function providerRequest(args: RequestArgs) {
-  const provider = getProvider()
+  const provider = await getProvider()
   if (!provider) throw new Error("No wallet provider available")
   return provider.request(args)
 }
@@ -26,7 +41,7 @@ export async function getWalletAddress(): Promise<string | null> {
 }
 
 export async function saveHero(hero: Hero, walletAddress: string) {
-  const { data, error } = await supabase
+  const { data, error } = await supabase()
     .from("heroes")
     .insert({
       wallet_address: walletAddress,
@@ -50,7 +65,7 @@ export async function saveHero(hero: Hero, walletAddress: string) {
 }
 
 export async function loadHeroes(walletAddress: string): Promise<Hero[]> {
-  const { data, error } = await supabase
+  const { data, error } = await supabase()
     .from("heroes")
     .select("*")
     .eq("wallet_address", walletAddress)
@@ -76,16 +91,12 @@ export async function loadHeroes(walletAddress: string): Promise<Hero[]> {
 }
 
 export async function updateHeroEquippedWeapon(heroId: string, equippedWeapon: EquippedWeapon | null) {
-  const { error } = await supabase
-    .from("heroes")
-    .update({ equipped_weapon: equippedWeapon })
-    .eq("id", heroId)
-
+  const { error } = await supabase().from("heroes").update({ equipped_weapon: equippedWeapon }).eq("id", heroId)
   if (error) throw error
 }
 
 export async function saveWeapon(weapon: Weapon, walletAddress: string) {
-  const { data, error } = await supabase
+  const { data, error } = await supabase()
     .from("weapons")
     .insert({
       wallet_address: walletAddress,
@@ -105,7 +116,7 @@ export async function saveWeapon(weapon: Weapon, walletAddress: string) {
 }
 
 export async function loadWeapons(walletAddress: string): Promise<Weapon[]> {
-  const { data, error } = await supabase
+  const { data, error } = await supabase()
     .from("weapons")
     .select("*")
     .eq("wallet_address", walletAddress)
@@ -127,11 +138,7 @@ export async function loadWeapons(walletAddress: string): Promise<Weapon[]> {
 }
 
 export async function markWeaponEquipped(weaponId: string, heroId: string | null) {
-  const { error } = await supabase
-    .from("weapons")
-    .update({ equipped_to_hero_id: heroId })
-    .eq("id", weaponId)
-
+  const { error } = await supabase().from("weapons").update({ equipped_to_hero_id: heroId }).eq("id", weaponId)
   if (error) throw error
 }
 
@@ -146,22 +153,16 @@ export async function saveStats(
     total_pulls?: number
   }
 ) {
-  const { error } = await supabase.from("player_stats").upsert({
+  const { error } = await supabase().from("player_stats").upsert({
     wallet_address: walletAddress,
     ...stats,
     updated_at: new Date().toISOString(),
   })
-
   if (error) throw error
 }
 
 export async function loadStats(walletAddress: string) {
-  const { data, error } = await supabase
-    .from("player_stats")
-    .select("*")
-    .eq("wallet_address", walletAddress)
-    .single()
-
+  const { data, error } = await supabase().from("player_stats").select("*").eq("wallet_address", walletAddress).single()
   if (error) return null
   return data
 }
