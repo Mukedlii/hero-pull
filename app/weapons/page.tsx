@@ -11,7 +11,7 @@ import {
   WEAPON_MINT_PRICE_WEI_HEX,
 } from "@/lib/weaponContract"
 
-const WEAPON_OWNER = "0xa782922Ff9c54F4264FD049189eC66940f528Eb0" as const
+// (owner withdraw UI removed)
 
 const WEAPONS_KEY = "hero-pull-weapons"
 
@@ -28,7 +28,6 @@ export default function WeaponsPage() {
   const [fid, setFid] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
   const [minting, setMinting] = useState(false)
-  const [withdrawing, setWithdrawing] = useState(false)
 
   useEffect(() => {
     ;(async () => {
@@ -313,56 +312,7 @@ export default function WeaponsPage() {
               {minting ? "Minting…" : "⛓ Mint Weapon NFT (~$0.15)"}
             </button>
 
-            <button
-              onClick={async () => {
-                if (!WEAPON_CONTRACT_ADDRESS) return
-                setWithdrawing(true)
-                try {
-                  const mod: any = await import("@farcaster/frame-sdk")
-                  const provider =
-                    mod?.default?.wallet?.ethProvider ?? mod?.sdk?.wallet?.ethProvider ?? (window as any).ethereum
-                  if (!provider) throw new Error("No wallet provider")
-
-                  try {
-                    await provider.request({ method: "eth_requestAccounts" })
-                  } catch {}
-
-                  const accounts = await provider.request({ method: "eth_accounts" })
-                  const from = accounts?.[0]
-                  if (!from) throw new Error("Wallet not connected")
-                  if (String(from).toLowerCase() !== WEAPON_OWNER.toLowerCase()) {
-                    alert("Only owner can withdraw")
-                    return
-                  }
-
-                  const data = encodeFunctionData({
-                    abi: WEAPON_ABI,
-                    functionName: "withdraw",
-                    args: [WEAPON_OWNER],
-                  })
-
-                  const txHash = (await provider.request({
-                    method: "eth_sendTransaction",
-                    params: [
-                      {
-                        chainId: BASE_CHAIN_ID_HEX,
-                        from,
-                        to: WEAPON_CONTRACT_ADDRESS,
-                        data,
-                      },
-                    ],
-                  })) as string
-
-                  alert(`Withdraw sent! Tx: ${txHash}`)
-                } finally {
-                  setWithdrawing(false)
-                }
-              }}
-              disabled={withdrawing}
-              className="bg-gray-800 hover:bg-gray-700 disabled:opacity-50 text-white font-bold py-2 px-6 rounded-2xl"
-            >
-              {withdrawing ? "Withdrawing…" : "💸 Withdraw mint fees (owner)"}
-            </button>
+            {/* withdraw button removed */}
           </>
         )}
       </div>
