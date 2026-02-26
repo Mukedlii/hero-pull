@@ -768,11 +768,13 @@ function endGame(win){
 }
 
 async function doShare(){
+  const frameUrl = 'https://hero-pull.vercel.app';
   const txt = G?.won
-    ? `I just CLEARED the dungeon and defeated the final boss! 🏰🐉🔥⚔️✨🏆\n+100 points earned — feeling unstoppable 😎💪🚀\n\nCan you beat my run? 👇\nhttps://hero-pull.vercel.app/dungeon`
-    : `I got absolutely DESTROYED in the dungeon… 😭💀🤕\nPlease help me beat the final boss — I need backup ASAP! 🏰🐉⚔️🙏\n\nPlay & try to defeat it for me 👇\nhttps://hero-pull.vercel.app/dungeon`;
+    ? `I just CLEARED the dungeon and defeated the final boss! 🏰🐉🔥⚔️✨🏆\n+100 points earned — feeling unstoppable 😎💪🚀\n\nMint your first hero & try the run 👇`
+    : `I got absolutely DESTROYED in the dungeon… 😭💀🤕\nPlease help me beat the final boss — I need backup ASAP! 🏰🐉⚔️🙏\n\nMint a hero and take your shot 👇`;
 
-  const url=`https://warpcast.com/~/compose?text=${encodeURIComponent(txt)}`;
+  // Use an embed so Warpcast shows the Frame card (mint page) instead of a raw link
+  const url=`https://warpcast.com/~/compose?text=${encodeURIComponent(txt)}&embeds[]=${encodeURIComponent(frameUrl)}`;
 
   try{
     const mod = await import('https://esm.sh/@farcaster/frame-sdk');
