@@ -317,7 +317,7 @@ async function loadOwnedHeroes(){
   if(!addr) return { addr: null, heroes: [], err: 'no_wallet' };
 
   // Always use full owned scan (chunked server-side) so we don't miss older mints.
-  const owned = await fetch(`/api/nft/owned?address=${encodeURIComponent(addr)}`, { cache:'no-store' })
+  const owned = await fetch(`/api/nft/owned?address=${encodeURIComponent(addr)}&fast=1`, { cache:'no-store' })
     .then(r=>r.json())
     .catch((e)=>({ error: String(e) }));
 
@@ -439,7 +439,7 @@ async function goSelect() {
 
   let res = null;
   try{
-    const timeout = new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')), 25000));
+    const timeout = new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')), 60000));
     res = await Promise.race([loadOwnedHeroes(), timeout]);
   }catch(e){
     res = { addr: null, heroes: [], err: String(e?.message||e) };

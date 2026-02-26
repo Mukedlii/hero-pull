@@ -71,19 +71,24 @@ export async function GET(req: NextRequest) {
     // De-dupe
     const unique = Array.from(new Set(tokenIds.map((x) => x.toString()))).map((s) => BigInt(s))
 
+    const fast = searchParams.get('fast') === '1'
+
     // Keep only tokens still owned by address (handles transfers out)
-    const owned: bigint[] = []
-    for (const id of unique) {
-      try {
-        const owner = await (client as any).readContract({
-          address: CONTRACT,
-          abi,
-          functionName: 'ownerOf',
-          args: [id],
-        })
-        if (String(owner).toLowerCase() === address.toLowerCase()) owned.push(id)
-      } catch {
-        // ignore
+    let owned: bigint[] = unique
+    if (!fast) {
+      owned = []
+      for (const id of unique) {
+        try {
+          const owner = await (client as any).readContract({
+            address: CONTRACT,
+            abi,
+            functionName: 'ownerOf',
+            args: [id],
+          })
+          if (String(owner).toLowerCase() === address.toLowerCase()) owned.push(id)
+        } catch {
+          // ignore
+        }
       }
     }
 
@@ -93,6 +98,7 @@ export async function GET(req: NextRequest) {
       fromBlock: fromBlock.toString(),
       latest: latest.toString(),
       tokenIds: owned.map((x) => x.toString()),
+      fast,
     })
   } catch (e: any) {
     return NextResponse.json({ error: String(e?.message || e) }, { status: 500 })
