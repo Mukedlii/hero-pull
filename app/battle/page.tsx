@@ -131,7 +131,7 @@ export default function BattlePage() {
         </div>
       )}
 
-      <BattleArena hero={hero} opponent={opponent} winner={winner} onBattleAgain={rollBattle} onShare={handleShare} />
+      <BattleArena hero={hero} opponent={opponent} winner={winner} battleId={battleId} onBattleAgain={rollBattle} onShare={handleShare} />
     </div>
   )
 }
