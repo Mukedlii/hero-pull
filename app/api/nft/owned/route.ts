@@ -20,6 +20,8 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url)
     const address = searchParams.get('address')
+    const lookbackParam = searchParams.get('lookback')
+    const lookback = lookbackParam ? BigInt(lookbackParam) : null
 
     if (!address || !address.startsWith('0x') || address.length !== 42) {
       return NextResponse.json({ error: 'missing/invalid address' }, { status: 400 })
@@ -33,7 +35,7 @@ export async function GET(req: NextRequest) {
     })
 
     const latest = await client.getBlockNumber()
-    const fromBlock = HERO_CONTRACT_DEPLOY_BLOCK
+    const fromBlock = lookback && lookback > 0n ? (latest > lookback ? latest - lookback : 0n) : HERO_CONTRACT_DEPLOY_BLOCK
 
     // Fetch Transfer logs TO address using topics (more robust than typed args on Vercel).
     const transferTopic =

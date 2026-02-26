@@ -289,7 +289,7 @@ async function loadOwnedHeroes(){
   const addr = await getWalletAddress();
   if(!addr) return [];
 
-  const owned = await fetch(`/api/nft/owned?address=${encodeURIComponent(addr)}`, { cache:'no-store' })
+  const owned = await fetch(`/api/nft/owned?address=${encodeURIComponent(addr)}&lookback=5000`, { cache:'no-store' })
     .then(r=>r.json())
     .catch(()=>null);
 
