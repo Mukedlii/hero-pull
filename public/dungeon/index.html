@@ -766,9 +766,20 @@ function endGame(win){
   }
 }
 
-function doShare(){
-  const txt=`I reached Floor ${G.floor} in Hero Pull: Dungeon Run! 🏰⚔️\nScore: ${G.score}pts | Hero: ${G.hero?.name||'?'}\nCan you beat me? 👇\nhttps://hero-pull.vercel.app/dungeon`;
-  window.open(`https://warpcast.com/~/compose?text=${encodeURIComponent(txt)}`,'_blank');
+async function doShare(){
+  const txt=`I just CLEARED the dungeon and defeated the final boss! 🏰🐉🔥⚔️✨🏆\n+100 points earned — feeling unstoppable 😎💪🚀\n\nCan you beat my run? 👇\nhttps://hero-pull.vercel.app/dungeon`;
+  const url=`https://warpcast.com/~/compose?text=${encodeURIComponent(txt)}`;
+
+  try{
+    const mod = await import('https://esm.sh/@farcaster/frame-sdk');
+    const sdk = mod?.default || mod?.sdk;
+    if(sdk?.actions?.openUrl){
+      await sdk.actions.openUrl(url);
+      return;
+    }
+  }catch{}
+
+  window.open(url,'_blank');
 }
 
 async function getEthProvider(){
