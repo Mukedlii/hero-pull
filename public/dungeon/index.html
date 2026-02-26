@@ -771,14 +771,62 @@ function doShare(){
   window.open(`https://warpcast.com/~/compose?text=${encodeURIComponent(txt)}`,'_blank');
 }
 
+async function getEthProvider(){
+  // Prefer injected wallets first
+  if(window.ethereum) return window.ethereum;
+
+  // Warpcast mini app wallet via frame-sdk
+  try{
+    const mod = await import('https://esm.sh/@farcaster/frame-sdk');
+    return mod?.default?.wallet?.ethProvider || mod?.sdk?.wallet?.ethProvider || null;
+  }catch{ return null; }
+}
+
+async function getFid(){
+  try{
+    const mod = await import('https://esm.sh/@farcaster/frame-sdk');
+    const ctx = await (mod?.default?.context ?? mod?.sdk?.context);
+    return ctx?.user?.fid || null;
+  }catch{ return null; }
+}
+
 async function mintVic(){
   try{
-    const p=(window).ethereum;
+    const p = await getEthProvider();
     if(!p){alert('No wallet!');return;}
-    await p.request({method:'eth_requestAccounts'});
-    await p.request({method:'eth_sendTransaction',params:[{to:'0xa782922Ff9c54F4264FD049189eC66940f528Eb0',value:'0x'+BigInt('200000000000000').toString(16),chainId:'0x'+Number(8453).toString(16)}]});
-    alert('🏆 Victory NFT minted!');
-  }catch(e){alert('Failed: '+e.message);}
+
+    // For injected wallets, request connect; Warpcast provider usually doesn't need it
+    try{ await p.request({method:'eth_requestAccounts'}); }catch{}
+
+    // send tx (0.0002 ETH) to contract on Base (8453)
+    const valueHex = '0x' + BigInt('200000000000000').toString(16);
+    const chainIdHex = '0x' + Number(8453).toString(16);
+
+    await p.request({
+      method:'eth_sendTransaction',
+      params:[{
+        chainId: chainIdHex,
+        to:'0xa782922Ff9c54F4264FD049189eC66940f528Eb0',
+        value: valueHex,
+      }]
+    });
+
+    // +100 points (best-effort)
+    try{
+      const fid = await getFid();
+      if(fid){
+        await fetch('/api/score/add',{
+          method:'POST',
+          headers:{'content-type':'application/json'},
+          body: JSON.stringify({ fid, delta: 100, action: 'admin', ref: 'dungeon_mint' })
+        });
+      }
+    }catch{}
+
+    alert('🏆 Victory NFT minted! +100 points');
+  }catch(e){
+    alert('Failed: '+(e?.message||String(e)));
+  }
 }
 </script>
 </body>
