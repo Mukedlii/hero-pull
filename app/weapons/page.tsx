@@ -243,7 +243,7 @@ export default function WeaponsPage() {
         <p className="text-center text-xs text-red-400 mt-2">
           Missing NEXT_PUBLIC_WEAPON_CONTRACT_ADDRESS
         </p>
-      )
+      )}
 
       <div className="mt-6 flex flex-col items-center gap-3">
         {WEAPON_CONTRACT_ADDRESS && (
