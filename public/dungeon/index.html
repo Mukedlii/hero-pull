@@ -165,10 +165,10 @@ html,body{width:100%;height:100%;background:#0a0a0f;font-family:'Press Start 2P'
   <div class="title-logo">HERO PULL</div>
   <div class="title-sub">⚔ DUNGEON RUN ⚔</div>
   <div class="title-chars">
-    <div class="title-char tc-c">🧑</div>
-    <div class="title-char tc-r">🦸</div>
-    <div class="title-char tc-e">🦹</div>
-    <div class="title-char tc-l">⚡</div>
+    <div class="title-char tc-c"><img src="https://api.dicebear.com/7.x/adventurer/png?seed=ShadowViper&size=64" style="width:48px;height:48px;border-radius:8px;image-rendering:auto;" /></div>
+    <div class="title-char tc-r"><img src="https://api.dicebear.com/7.x/adventurer/png?seed=NeonFalcon&size=64" style="width:48px;height:48px;border-radius:8px;image-rendering:auto;" /></div>
+    <div class="title-char tc-e"><img src="https://api.dicebear.com/7.x/adventurer/png?seed=VoidWalker&size=64" style="width:48px;height:48px;border-radius:8px;image-rendering:auto;" /></div>
+    <div class="title-char tc-l"><img src="https://api.dicebear.com/7.x/adventurer/png?seed=GoldenPhoenix&size=64" style="width:48px;height:48px;border-radius:8px;image-rendering:auto;" /></div>
   </div>
   <button class="btn btn-gold" onclick="goSelect()">▶ START RUN</button>
   <div class="hs-text" id="hs-txt"></div>
@@ -248,6 +248,29 @@ html,body{width:100%;height:100%;background:#0a0a0f;font-family:'Press Start 2P'
 
 <script>
 // ═══ DATA ═══
+const HERO_SEEDS = {
+  'Shadow Viper': 'ShadowViper',
+  'Iron Fist': 'IronFist',
+  'Neon Falcon': 'NeonFalcon',
+  'Azure Spectre': 'AzureSpectre',
+  'Storm Chaser': 'StormChaser',
+  'Crimson Phantom': 'CrimsonPhantom',
+  'Void Walker': 'VoidWalker',
+  'Emerald Knight': 'EmeraldKnight',
+  'Golden Phoenix': 'GoldenPhoenix',
+  'Silver Sentinel': 'SilverSentinel',
+};
+
+function heroAvatarUrl(heroName, size=64) {
+  const seed = HERO_SEEDS[heroName] || String(heroName || 'Hero').replace(/\s+/g, '');
+  return `https://api.dicebear.com/7.x/adventurer/png?seed=${encodeURIComponent(seed)}&size=${size}`;
+}
+
+function heroAvatarImg(heroName, size=64) {
+  const src = heroAvatarUrl(heroName, size);
+  return `<img src="${src}" style="width:${size}px;height:${size}px;border-radius:8px;image-rendering:auto;" />`;
+}
+
 const HEROES = [
   {name:'Shadow Viper',rarity:'common',emoji:'🐍',atk:38,def:22,spd:42,hp:80,power:'Poison Fang',color:'#9ca3af'},
   {name:'Iron Fist',rarity:'common',emoji:'👊',atk:42,def:32,spd:26,hp:90,power:'Power Smash',color:'#9ca3af'},
@@ -337,7 +360,7 @@ function goSelect() {
     d.onclick=()=>selCard(i,h,d);
     d.innerHTML=`
       <div class="hcard-rarity" style="color:${h.color}">${h.rarity.toUpperCase()}</div>
-      <span class="hcard-char">${h.emoji}</span>
+      <span class="hcard-char">${heroAvatarImg(h.name, 48)}</span>
       <div class="hcard-name">${h.name}</div>
       <div class="hcard-stats">❤️${h.hp} ⚔️${h.atk}<br>🛡️${h.def} ⚡${h.spd}<br>✨${h.power}</div>`;
     wrap.appendChild(d);
@@ -365,7 +388,7 @@ function startRun(){
 function updatePanel(){
   const h=G.hero;
   const w=h.weapon;
-  document.getElementById('h-char').textContent=h.emoji;
+  document.getElementById('h-char').innerHTML=heroAvatarImg(h.name, 64);
   document.getElementById('h-name').textContent=h.name;
   document.getElementById('h-rar').innerHTML=`<span style="color:${h.color}">${h.rarity.toUpperCase()}</span>`;
   document.getElementById('h-hp').textContent=h.currentHp;
@@ -431,7 +454,7 @@ function doBattleRoom(boss,area){
     <div class="battle-stage" id="bstage">
       <div class="comb" id="hcomb">
         <div class="comb-name" style="color:${G.hero.color}">${G.hero.name}</div>
-        <span class="comb-char" id="hchar">${G.hero.emoji}</span>
+        <span class="comb-char" id="hchar">${heroAvatarImg(G.hero.name, 64)}</span>
       </div>
       <div class="vs">VS</div>
       <div class="comb" id="ecomb">
