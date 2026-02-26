@@ -165,10 +165,10 @@ html,body{width:100%;height:100%;background:#0a0a0f;font-family:'Press Start 2P'
   <div class="title-logo">HERO PULL</div>
   <div class="title-sub">⚔ DUNGEON RUN ⚔</div>
   <div class="title-chars">
-    <div class="title-char tc-c"><img src="https://api.dicebear.com/7.x/adventurer/png?seed=ShadowViper&size=64" style="width:48px;height:48px;border-radius:8px;image-rendering:auto;" /></div>
-    <div class="title-char tc-r"><img src="https://api.dicebear.com/7.x/adventurer/png?seed=NeonFalcon&size=64" style="width:48px;height:48px;border-radius:8px;image-rendering:auto;" /></div>
-    <div class="title-char tc-e"><img src="https://api.dicebear.com/7.x/adventurer/png?seed=VoidWalker&size=64" style="width:48px;height:48px;border-radius:8px;image-rendering:auto;" /></div>
-    <div class="title-char tc-l"><img src="https://api.dicebear.com/7.x/adventurer/png?seed=GoldenPhoenix&size=64" style="width:48px;height:48px;border-radius:8px;image-rendering:auto;" /></div>
+    <div class="title-char tc-c"><img src="https://api.dicebear.com/7.x/adventurer/png?seed=IronFist&size=48" style="width:44px;height:44px;border-radius:6px;" /></div>
+    <div class="title-char tc-r"><img src="https://api.dicebear.com/7.x/adventurer/png?seed=NeonFalcon&size=48" style="width:44px;height:44px;border-radius:6px;" /></div>
+    <div class="title-char tc-e"><img src="https://api.dicebear.com/7.x/adventurer/png?seed=CrimsonPhantom&size=48" style="width:44px;height:44px;border-radius:6px;" /></div>
+    <div class="title-char tc-l"><img src="https://api.dicebear.com/7.x/adventurer/png?seed=GoldenPhoenix&size=48" style="width:44px;height:44px;border-radius:6px;" /></div>
   </div>
   <button class="btn btn-gold" onclick="goSelect()">▶ START RUN</button>
   <div class="hs-text" id="hs-txt"></div>
@@ -194,7 +194,7 @@ html,body{width:100%;height:100%;background:#0a0a0f;font-family:'Press Start 2P'
   <div class="g-body">
     <div class="h-panel">
       <div class="h-panel-row">
-        <div class="h-char" id="h-char">🧑</div>
+        <div class="h-char" id="h-char" style="font-size:0;"></div>
         <div class="h-info">
           <div class="h-name" id="h-name">Hero</div>
           <div class="h-rar" id="h-rar"></div>
@@ -248,40 +248,21 @@ html,body{width:100%;height:100%;background:#0a0a0f;font-family:'Press Start 2P'
 
 <script>
 // ═══ DATA ═══
-const HERO_SEEDS = {
-  'Shadow Viper': 'ShadowViper',
-  'Iron Fist': 'IronFist',
-  'Neon Falcon': 'NeonFalcon',
-  'Azure Spectre': 'AzureSpectre',
-  'Storm Chaser': 'StormChaser',
-  'Crimson Phantom': 'CrimsonPhantom',
-  'Void Walker': 'VoidWalker',
-  'Emerald Knight': 'EmeraldKnight',
-  'Golden Phoenix': 'GoldenPhoenix',
-  'Silver Sentinel': 'SilverSentinel',
-};
-
-function heroAvatarUrl(heroName, size=64) {
-  const seed = HERO_SEEDS[heroName] || String(heroName || 'Hero').replace(/\s+/g, '');
-  return `https://api.dicebear.com/7.x/adventurer/png?seed=${encodeURIComponent(seed)}&size=${size}`;
-}
-
-function heroAvatarImg(heroName, size=64) {
-  const src = heroAvatarUrl(heroName, size);
-  return `<img src="${src}" style="width:${size}px;height:${size}px;border-radius:8px;image-rendering:auto;" />`;
+function heroImg(seed,size=64){
+  return `<img src="https://api.dicebear.com/7.x/adventurer/png?seed=${seed}&size=${size}" style="width:${size}px;height:${size}px;border-radius:8px;image-rendering:auto;display:block;" />`;
 }
 
 const HEROES = [
-  {name:'Shadow Viper',rarity:'common',emoji:'🐍',atk:38,def:22,spd:42,hp:80,power:'Poison Fang',color:'#9ca3af'},
-  {name:'Iron Fist',rarity:'common',emoji:'👊',atk:42,def:32,spd:26,hp:90,power:'Power Smash',color:'#9ca3af'},
-  {name:'Neon Falcon',rarity:'rare',emoji:'🦅',atk:46,def:28,spd:52,hp:100,power:'Lightning Dive',color:'#60a5fa'},
-  {name:'Azure Spectre',rarity:'rare',emoji:'👻',atk:38,def:48,spd:34,hp:105,power:'Ice Barrier',color:'#60a5fa'},
-  {name:'Storm Chaser',rarity:'rare',emoji:'⚡',atk:50,def:30,spd:55,hp:95,power:'Thunder Rush',color:'#60a5fa'},
-  {name:'Crimson Phantom',rarity:'epic',emoji:'🔥',atk:58,def:38,spd:46,hp:125,power:'Dark Slash',color:'#c084fc'},
-  {name:'Void Walker',rarity:'epic',emoji:'🌑',atk:62,def:34,spd:56,hp:120,power:'Shadow Step',color:'#c084fc'},
-  {name:'Emerald Knight',rarity:'epic',emoji:'💚',atk:50,def:60,spd:36,hp:140,power:'Nature Guard',color:'#c084fc'},
-  {name:'Golden Phoenix',rarity:'legendary',emoji:'🦅',atk:72,def:52,spd:62,hp:160,power:'Rebirth Flame',color:'#ffd700'},
-  {name:'Silver Sentinel',rarity:'legendary',emoji:'⚔️',atk:66,def:72,spd:42,hp:170,power:'Holy Shield',color:'#ffd700'},
+  {name:'Shadow Viper',rarity:'common',seed:'ShadowViper',atk:38,def:22,spd:42,hp:80,power:'Poison Fang',color:'#9ca3af'},
+  {name:'Iron Fist',rarity:'common',seed:'IronFist',atk:42,def:32,spd:26,hp:90,power:'Power Smash',color:'#9ca3af'},
+  {name:'Neon Falcon',rarity:'rare',seed:'NeonFalcon',atk:46,def:28,spd:52,hp:100,power:'Lightning Dive',color:'#60a5fa'},
+  {name:'Azure Spectre',rarity:'rare',seed:'AzureSpectre',atk:38,def:48,spd:34,hp:105,power:'Ice Barrier',color:'#60a5fa'},
+  {name:'Storm Chaser',rarity:'rare',seed:'StormChaser',atk:50,def:30,spd:55,hp:95,power:'Thunder Rush',color:'#60a5fa'},
+  {name:'Crimson Phantom',rarity:'epic',seed:'CrimsonPhantom',atk:58,def:38,spd:46,hp:125,power:'Dark Slash',color:'#c084fc'},
+  {name:'Void Walker',rarity:'epic',seed:'VoidWalker',atk:62,def:34,spd:56,hp:120,power:'Shadow Step',color:'#c084fc'},
+  {name:'Emerald Knight',rarity:'epic',seed:'EmeraldKnight',atk:50,def:60,spd:36,hp:140,power:'Nature Guard',color:'#c084fc'},
+  {name:'Golden Phoenix',rarity:'legendary',seed:'GoldenPhoenix',atk:72,def:52,spd:62,hp:160,power:'Rebirth Flame',color:'#ffd700'},
+  {name:'Silver Sentinel',rarity:'legendary',seed:'SilverSentinel',atk:66,def:72,spd:42,hp:170,power:'Holy Shield',color:'#ffd700'},
 ];
 
 const ENEMIES = [
@@ -360,7 +341,7 @@ function goSelect() {
     d.onclick=()=>selCard(i,h,d);
     d.innerHTML=`
       <div class="hcard-rarity" style="color:${h.color}">${h.rarity.toUpperCase()}</div>
-      <span class="hcard-char">${heroAvatarImg(h.name, 48)}</span>
+      <img src="https://api.dicebear.com/7.x/adventurer/png?seed=${h.seed}&size=64" style="width:56px;height:56px;border-radius:8px;margin:4px auto;display:block;animation:floatY 2s ease-in-out infinite;" />
       <div class="hcard-name">${h.name}</div>
       <div class="hcard-stats">❤️${h.hp} ⚔️${h.atk}<br>🛡️${h.def} ⚡${h.spd}<br>✨${h.power}</div>`;
     wrap.appendChild(d);
@@ -388,7 +369,7 @@ function startRun(){
 function updatePanel(){
   const h=G.hero;
   const w=h.weapon;
-  document.getElementById('h-char').innerHTML=heroAvatarImg(h.name, 64);
+  document.getElementById('h-char').innerHTML=`<img src="https://api.dicebear.com/7.x/adventurer/png?seed=${h.seed}&size=56" style="width:56px;height:56px;border-radius:8px;animation:floatY 2s ease-in-out infinite;" />`;
   document.getElementById('h-name').textContent=h.name;
   document.getElementById('h-rar').innerHTML=`<span style="color:${h.color}">${h.rarity.toUpperCase()}</span>`;
   document.getElementById('h-hp').textContent=h.currentHp;
@@ -454,12 +435,12 @@ function doBattleRoom(boss,area){
     <div class="battle-stage" id="bstage">
       <div class="comb" id="hcomb">
         <div class="comb-name" style="color:${G.hero.color}">${G.hero.name}</div>
-        <span class="comb-char" id="hchar">${heroAvatarImg(G.hero.name, 64)}</span>
+        <img id="hchar" src="https://api.dicebear.com/7.x/adventurer/png?seed=${G.hero.seed}&size=64" style="width:64px;height:64px;border-radius:8px;animation:floatY 2s ease-in-out infinite;display:block;margin:0 auto;" />
       </div>
       <div class="vs">VS</div>
       <div class="comb" id="ecomb">
         <div class="comb-name" style="color:#ef4444">${G.enemy.name}</div>
-        <span class="comb-char enemy-anim" id="echar">${G.enemy.emoji}</span>
+        <span id="echar" style="font-size:48px;display:block;text-align:center;animation:enemySway 1.5s ease-in-out infinite;">${G.enemy.emoji}</span>
         <div class="e-hpbar">
           <div class="bar-lbl">HP <span id="ehp">${G.enemy.currentHp}</span>/${G.enemy.hp}</div>
           <div class="bar-out" style="width:80px"><div class="bar-in hp-bar" id="ehpbar" style="width:100%"></div></div>
