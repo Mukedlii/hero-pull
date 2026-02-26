@@ -156,7 +156,10 @@ export default function WeaponsPage() {
     return c
   }, [weapons])
 
-  const canMergeRarity = (r: WeaponRarity) => (r === "Legendary" ? false : counts[r] >= 3)
+  const canMergeRarity = (r: WeaponRarity) => {
+    if (!weapons.length) return false
+    return r === "Legendary" ? false : counts[r] >= 3
+  }
 
   const mergeRarity = async (r: WeaponRarity) => {
     if (!canMergeRarity(r)) return
@@ -232,7 +235,13 @@ export default function WeaponsPage() {
   return (
     <div className="px-4 pb-24">
       <h1 className="text-2xl font-extrabold text-center mt-6">⚔️ Weapons</h1>
-      <p className="text-center text-gray-400 mt-2 text-sm">Forge & merge weapons (local prototype)</p>
+      <p className="text-center text-gray-400 mt-2 text-sm">Forge & merge weapons</p>
+
+      {!WEAPON_CONTRACT_ADDRESS && (
+        <p className="text-center text-xs text-red-400 mt-2">
+          Missing NEXT_PUBLIC_WEAPON_CONTRACT_ADDRESS
+        </p>
+      )
 
       <div className="mt-6 flex flex-col items-center gap-3">
         <button
@@ -283,20 +292,29 @@ export default function WeaponsPage() {
                     ],
                   })) as string
 
+                  // refresh onchain inventory (poll a bit; tx may not be mined yet)
                   try {
-                    const res = await fetch(`/api/weapons/onchain?address=${from}`, { cache: "no-store" })
-                    const json = await res.json()
-                    const items = Array.isArray(json?.items) ? json.items : []
-                    const list: Weapon[] = []
-                    for (const it of items) {
-                      const qty = Number(it?.balance || 0)
-                      const w = it?.weapon as Weapon
-                      if (w && qty > 0) {
-                        for (let i = 0; i < qty; i++) list.push({ ...w, id: `${w.id}-${i}` })
+                    for (let attempt = 0; attempt < 8; attempt++) {
+                      const res = await fetch(`/api/weapons/onchain?address=${from}`, { cache: "no-store" })
+                      const json = await res.json()
+                      const items = Array.isArray(json?.items) ? json.items : []
+                      const list: Weapon[] = []
+                      let total = 0
+                      for (const it of items) {
+                        const qty = Number(it?.balance || 0)
+                        total += qty
+                        const w = it?.weapon as Weapon
+                        if (w && qty > 0) {
+                          for (let i = 0; i < qty; i++) list.push({ ...w, id: `${w.id}-${i}` })
+                        }
                       }
+                      if (total > weapons.length) {
+                        setWeapons(list)
+                        if (items?.[0]?.weapon) setLastForged(items[0].weapon as Weapon)
+                        break
+                      }
+                      await new Promise((r) => setTimeout(r, 1200))
                     }
-                    setWeapons(list)
-                    if (items?.[0]?.weapon) setLastForged(items[0].weapon as Weapon)
                   } catch {}
 
                   try {
