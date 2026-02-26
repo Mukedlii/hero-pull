@@ -5,7 +5,7 @@ import { base } from 'viem/chains'
 const CONTRACT = '0xA728A918A767bB085D4ac895b8F2d2AbD0dE27bB' as const
 
 // NOTE: Base RPC often limits eth_getLogs ranges (e.g. 10,000 blocks). Keep this small.
-const DEFAULT_LOOKBACK_BLOCKS = 9_500n
+const DEFAULT_LOOKBACK_BLOCKS = 5_000n
 
 const abi = parseAbi([
   'event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)',
