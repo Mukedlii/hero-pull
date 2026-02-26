@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import type { Hero } from "@/lib/heroes"
+import type { Hero, EquippedWeapon } from "@/lib/heroes"
 
 const rarityBorder: Record<Hero["rarity"], string> = {
   Common: "border-gray-500",
@@ -10,8 +10,21 @@ const rarityBorder: Record<Hero["rarity"], string> = {
   Legendary: "border-yellow-400 shadow-[0_0_20px_#ffd700]",
 }
 
+type Weapon = {
+  id: string
+  name: string
+  rarity: EquippedWeapon["rarity"]
+  imageEmoji: string
+  bonusATK: number
+  bonusDEF: number
+  bonusSPD: number
+}
+
 export default function CollectionPage() {
   const [collection, setCollection] = useState<Hero[]>([])
+  const [weapons, setWeapons] = useState<Weapon[]>([])
+  const [equipIndex, setEquipIndex] = useState<number | null>(null)
+
   const [walletAddress, setWalletAddress] = useState<string | null>(null)
   const [onchainTokenIds, setOnchainTokenIds] = useState<string[]>([])
   const [onchainHeroes, setOnchainHeroes] = useState<Record<string, Hero>>({})
@@ -23,6 +36,14 @@ export default function CollectionPage() {
       setCollection(raw ? (JSON.parse(raw) as Hero[]) : [])
     } catch {
       setCollection([])
+    }
+
+    // Load weapons (localStorage)
+    try {
+      const wraw = localStorage.getItem("hero-pull-weapons")
+      setWeapons(wraw ? (JSON.parse(wraw) as Weapon[]) : [])
+    } catch {
+      setWeapons([])
     }
 
     // Onchain restore: fetch owned tokenIds for connected wallet.
@@ -70,6 +91,41 @@ export default function CollectionPage() {
 
   const isEmpty = useMemo(() => !collection || collection.length === 0, [collection])
   const hasOnchain = useMemo(() => onchainTokenIds.length > 0, [onchainTokenIds])
+
+  const persistCollection = (next: Hero[]) => {
+    setCollection(next)
+    localStorage.setItem("hero-pull-collection", JSON.stringify(next))
+  }
+
+  const equipWeapon = (heroIndex: number, weapon: Weapon) => {
+    const next = [...collection]
+    const h = { ...next[heroIndex] }
+    const equippedWeapon: EquippedWeapon = {
+      name: weapon.name,
+      rarity: weapon.rarity,
+      imageEmoji: weapon.imageEmoji,
+      bonusATK: weapon.bonusATK,
+      bonusDEF: weapon.bonusDEF,
+      bonusSPD: weapon.bonusSPD,
+    }
+    h.equippedWeapon = equippedWeapon
+    next[heroIndex] = h
+    persistCollection(next)
+
+    try {
+      const currentRaw = localStorage.getItem("hero-pull-current-hero")
+      if (currentRaw) {
+        const current = JSON.parse(currentRaw) as Hero
+        if (current.name === h.name && current.power === h.power) {
+          localStorage.setItem("hero-pull-current-hero", JSON.stringify(h))
+        }
+      }
+    } catch {
+      // ignore
+    }
+
+    setEquipIndex(null)
+  }
 
   const selectHero = (hero: Hero) => {
     localStorage.setItem("hero-pull-current-hero", JSON.stringify(hero))
@@ -170,6 +226,46 @@ export default function CollectionPage() {
             <p className="text-xs">
               ATK:{hero.attack} DEF:{hero.defense} SPD:{hero.speed}
             </p>
+
+            {hero.equippedWeapon ? (
+              <p className="text-xs text-gray-300">
+                {hero.equippedWeapon.imageEmoji} {hero.equippedWeapon.name} (+{hero.equippedWeapon.bonusATK} ATK)
+              </p>
+            ) : (
+              <p className="text-xs text-gray-500">No weapon equipped</p>
+            )}
+
+            {weapons.length > 0 && (
+              <button
+                onClick={() => setEquipIndex(idx)}
+                className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs py-1 px-3 rounded-lg"
+              >
+                Equip
+              </button>
+            )}
+
+            {equipIndex === idx && (
+              <div className="w-full border-t border-gray-700 pt-2 text-left">
+                <p className="text-xs text-gray-400 mb-1">Select a weapon:</p>
+                <div className="space-y-1 max-h-40 overflow-y-auto">
+                  {weapons.map((w) => (
+                    <button
+                      key={w.id}
+                      onClick={() => equipWeapon(idx, w)}
+                      className="w-full flex items-center gap-2 px-2 py-1 bg-gray-800 hover:bg-gray-700 text-xs rounded"
+                    >
+                      <span className="text-base">{w.imageEmoji}</span>
+                      <span>{w.name}</span>
+                      <span className="ml-auto text-[10px] text-gray-400">{w.rarity}</span>
+                    </button>
+                  ))}
+                </div>
+                <button onClick={() => setEquipIndex(null)} className="mt-2 text-[10px] text-blue-300 underline">
+                  Cancel
+                </button>
+              </div>
+            )}
+
             <button
               onClick={() => selectHero(hero)}
               className="bg-red-600 hover:bg-red-500 text-white text-xs py-1 px-3 rounded-lg"

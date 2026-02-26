@@ -1,3 +1,12 @@
+export type EquippedWeapon = {
+  name: string
+  rarity: 'Common' | 'Rare' | 'Epic' | 'Legendary'
+  imageEmoji: string
+  bonusATK: number
+  bonusDEF: number
+  bonusSPD: number
+}
+
 export type Hero = {
   name: string
   gender: 'Male' | 'Female' | 'Unknown'
@@ -9,6 +18,7 @@ export type Hero = {
   speed: number
   xp: number
   level: number
+  equippedWeapon?: EquippedWeapon
 }
 
 const names = [
