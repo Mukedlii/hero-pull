@@ -284,17 +284,36 @@ async function getWalletAddress(){
 }
 
 async function connectWallet(){
+  const p = await getEthProvider();
+  if(!p){
+    alert('No wallet provider in this view. Open in Warpcast mini app.');
+    return null;
+  }
+
   try{
-    const p = await getEthProvider();
-    if(!p){ alert('No wallet provider'); return; }
     await p.request({ method:'eth_requestAccounts' });
   }catch(e){
-    // ignore
+    alert('Connect failed: ' + (e?.message||String(e)));
+    return null;
+  }
+
+  try{
+    const accounts = await p.request({ method:'eth_accounts' });
+    const addr = accounts && accounts[0] ? accounts[0] : null;
+    if(addr) alert('Connected: ' + addr.slice(0,6) + '…' + addr.slice(-4));
+    return addr;
+  }catch{
+    alert('Connected, but cannot read address');
+    return null;
   }
 }
 
 async function loadOwnedHeroes(){
-  const addr = await getWalletAddress();
+  let addr = await getWalletAddress();
+  if(!addr){
+    await connectWallet();
+    addr = await getWalletAddress();
+  }
   if(!addr) return { addr: null, heroes: [], err: 'no_wallet' };
 
   const owned = await fetch(`/api/nft/owned?address=${encodeURIComponent(addr)}&lookback=5000`, { cache:'no-store' })
