@@ -4,6 +4,7 @@ import { useState } from "react"
 import frameSdk from "@farcaster/frame-sdk"
 import { generateHero, type Hero } from "@/lib/heroes"
 import { HERO_PULL_MINT_PRICE_ETH } from "@/lib/heroPullContract"
+import { getWalletAddress, loadStats, saveHero, saveStats } from "@/lib/db"
 
 interface Props {
   onPulled: (hero: Hero) => void
@@ -132,12 +133,21 @@ export default function MintButton({ onPulled }: Props) {
       setTxHash(hash)
       setStatus("Confirming…")
 
-      // Save minted hero locally (acts as the user's collection/NFT list for now)
+      // Persist hero (Supabase if wallet connected; fallback localStorage)
       try {
-        const raw = localStorage.getItem("hero-pull-collection")
-        const collection = raw ? (JSON.parse(raw) as Hero[]) : []
-        collection.unshift(hero)
-        localStorage.setItem("hero-pull-collection", JSON.stringify(collection))
+        const wallet = await getWalletAddress()
+        if (wallet) {
+          await saveHero(hero, wallet)
+          const prev = await loadStats(wallet)
+          const total = Number(prev?.total_pulls || 0) + 1
+          await saveStats(wallet, { total_pulls: total })
+        } else {
+          const raw = localStorage.getItem("hero-pull-collection")
+          const collection = raw ? (JSON.parse(raw) as Hero[]) : []
+          collection.unshift(hero)
+          localStorage.setItem("hero-pull-collection", JSON.stringify(collection))
+        }
+
         localStorage.setItem("hero-pull-current-hero", JSON.stringify(hero))
       } catch {
         // ignore

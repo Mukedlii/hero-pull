@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { readScore } from "@/lib/score"
+import { getWalletAddress, loadStats } from "@/lib/db"
 
 type Item = { fid: number; score: number }
 
@@ -11,9 +12,23 @@ export default function StatsPage() {
   const [leaderboard, setLeaderboard] = useState<Item[]>([])
 
   useEffect(() => {
-    readScore().then(setScore).catch(() => setScore(0))
-
+    // Prefer Supabase stats when wallet connected
     ;(async () => {
+      try {
+        const wallet = await getWalletAddress()
+        if (wallet) {
+          const s: any = await loadStats(wallet)
+          if (s?.points != null) setScore(Number(s.points))
+          else setScore(0)
+          return
+        }
+      } catch {
+        // ignore
+      }
+
+      // fallback: existing fid-based scoring
+      readScore().then(setScore).catch(() => setScore(0))
+
       try {
         const mod: any = await import("@farcaster/frame-sdk")
         const ctx: any = await mod?.sdk?.context

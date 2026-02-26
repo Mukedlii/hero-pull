@@ -19,6 +19,7 @@ export type Hero = {
   xp: number
   level: number
   equippedWeapon?: EquippedWeapon
+  dbId?: string
 }
 
 const names = [

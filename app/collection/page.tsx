@@ -2,22 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react"
 import type { Hero, EquippedWeapon } from "@/lib/heroes"
+import type { Weapon } from "@/lib/weapons"
+import { getWalletAddress, loadHeroes, loadWeapons, markWeaponEquipped, updateHeroEquippedWeapon } from "@/lib/db"
 
 const rarityBorder: Record<Hero["rarity"], string> = {
   Common: "border-gray-500",
   Rare: "border-blue-500 shadow-[0_0_12px_#60a5fa]",
   Epic: "border-purple-500 shadow-[0_0_15px_#c084fc]",
   Legendary: "border-yellow-400 shadow-[0_0_20px_#ffd700]",
-}
-
-type Weapon = {
-  id: string
-  name: string
-  rarity: EquippedWeapon["rarity"]
-  imageEmoji: string
-  bonusATK: number
-  bonusDEF: number
-  bonusSPD: number
 }
 
 export default function CollectionPage() {
@@ -31,23 +23,49 @@ export default function CollectionPage() {
   const [loadingOnchain, setLoadingOnchain] = useState(false)
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem("hero-pull-collection")
-      setCollection(raw ? (JSON.parse(raw) as Hero[]) : [])
-    } catch {
-      setCollection([])
-    }
-
-    // Load weapons (localStorage)
-    try {
-      const wraw = localStorage.getItem("hero-pull-weapons")
-      setWeapons(wraw ? (JSON.parse(wraw) as Weapon[]) : [])
-    } catch {
-      setWeapons([])
-    }
-
-    // Onchain restore: fetch owned tokenIds for connected wallet.
     ;(async () => {
+      // Prefer Supabase (wallet)
+      try {
+        const wallet = await getWalletAddress()
+        if (wallet) {
+          setWalletAddress(wallet)
+          const [hs, ws] = await Promise.all([loadHeroes(wallet), loadWeapons(wallet)])
+          setCollection(hs)
+          setWeapons(ws)
+        } else {
+          // fallback localStorage
+          try {
+            const raw = localStorage.getItem("hero-pull-collection")
+            setCollection(raw ? (JSON.parse(raw) as Hero[]) : [])
+          } catch {
+            setCollection([])
+          }
+
+          try {
+            const wraw = localStorage.getItem("hero-pull-weapons")
+            setWeapons(wraw ? (JSON.parse(wraw) as Weapon[]) : [])
+          } catch {
+            setWeapons([])
+          }
+        }
+      } catch {
+        // fallback localStorage
+        try {
+          const raw = localStorage.getItem("hero-pull-collection")
+          setCollection(raw ? (JSON.parse(raw) as Hero[]) : [])
+        } catch {
+          setCollection([])
+        }
+
+        try {
+          const wraw = localStorage.getItem("hero-pull-weapons")
+          setWeapons(wraw ? (JSON.parse(wraw) as Weapon[]) : [])
+        } catch {
+          setWeapons([])
+        }
+      }
+
+      // Onchain restore (optional)
       try {
         setLoadingOnchain(true)
         const mod: any = await import("@farcaster/frame-sdk")
@@ -64,7 +82,6 @@ export default function CollectionPage() {
         const ids: string[] = Array.isArray(json?.tokenIds) ? json.tokenIds : []
         setOnchainTokenIds(ids)
 
-        // Fetch deterministic hero metadata per tokenId
         const entries = await Promise.all(
           ids.map(async (id: string) => {
             try {
@@ -94,10 +111,15 @@ export default function CollectionPage() {
 
   const persistCollection = (next: Hero[]) => {
     setCollection(next)
-    localStorage.setItem("hero-pull-collection", JSON.stringify(next))
+    // fallback cache (only used if no wallet)
+    try {
+      localStorage.setItem("hero-pull-collection", JSON.stringify(next))
+    } catch {
+      // ignore
+    }
   }
 
-  const equipWeapon = (heroIndex: number, weapon: Weapon) => {
+  const equipWeapon = async (heroIndex: number, weapon: Weapon) => {
     const next = [...collection]
     const h = { ...next[heroIndex] }
     const equippedWeapon: EquippedWeapon = {
@@ -111,6 +133,16 @@ export default function CollectionPage() {
     h.equippedWeapon = equippedWeapon
     next[heroIndex] = h
     persistCollection(next)
+
+    // Persist to Supabase when possible
+    try {
+      if (walletAddress && h.dbId) {
+        await updateHeroEquippedWeapon(h.dbId, equippedWeapon)
+        await markWeaponEquipped(weapon.id, h.dbId)
+      }
+    } catch {
+      // ignore
+    }
 
     try {
       const currentRaw = localStorage.getItem("hero-pull-current-hero")

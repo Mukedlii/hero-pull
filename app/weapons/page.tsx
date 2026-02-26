@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { Weapon, WeaponRarity, generateWeapon, nextWeaponRarity } from "@/lib/weapons"
+import { getWalletAddress, loadWeapons, saveWeapon } from "@/lib/db"
 
 const WEAPONS_KEY = "hero-pull-weapons"
 
@@ -20,13 +21,25 @@ export default function WeaponsPage() {
 
   useEffect(() => {
     ;(async () => {
+      // Prefer Supabase inventory if wallet connected
+      try {
+        const wallet = await getWalletAddress()
+        if (wallet) {
+          const list = await loadWeapons(wallet)
+          setWeapons(list)
+          return
+        }
+      } catch {
+        // ignore
+      }
+
+      // Fallback 1: server inventory (fid)
       try {
         const mod: any = await import("@farcaster/frame-sdk")
         const ctx: any = await mod?.sdk?.context
         const f = ctx?.user?.fid
         if (f) setFid(f)
 
-        // Prefer server inventory if fid exists
         if (f) {
           const res = await fetch(`/api/weapons/list?fid=${f}`, { cache: "no-store" })
           const json = await res.json()
@@ -38,7 +51,7 @@ export default function WeaponsPage() {
         // ignore
       }
 
-      // fallback: localStorage
+      // Fallback 2: localStorage
       try {
         const raw = localStorage.getItem(WEAPONS_KEY)
         setWeapons(raw ? (JSON.parse(raw) as Weapon[]) : [])
@@ -63,6 +76,25 @@ export default function WeaponsPage() {
   const handleForge = async () => {
     setLoading(true)
     try {
+      // Prefer Supabase (wallet)
+      try {
+        const wallet = await getWalletAddress()
+        if (wallet) {
+          const w = generateWeapon()
+          const row: any = await saveWeapon(w, wallet)
+          const list = await loadWeapons(wallet)
+          setWeapons(list)
+          setLastForged({
+            ...w,
+            id: row?.id ?? w.id,
+          })
+          return
+        }
+      } catch {
+        // ignore
+      }
+
+      // Fallback: server (fid)
       if (fid) {
         const res = await fetch('/api/weapons/forge', {
           method: 'POST',
@@ -76,7 +108,7 @@ export default function WeaponsPage() {
         return
       }
 
-      // fallback local
+      // Fallback: localStorage
       const w = generateWeapon()
       const next = [w, ...weapons]
       saveLocal(next)
@@ -98,6 +130,38 @@ export default function WeaponsPage() {
     if (!canMergeRarity(r)) return
     setLoading(true)
     try {
+      // Supabase merge (wallet): best-effort local merge, then re-save list
+      try {
+        const wallet = await getWalletAddress()
+        if (wallet) {
+          const list = await loadWeapons(wallet)
+          const target = nextWeaponRarity(r)
+          const nextList: Weapon[] = []
+          let removed = 0
+          for (const w of list) {
+            if (w.rarity === r && removed < 3) {
+              removed++
+              continue
+            }
+            nextList.push(w)
+          }
+          let nw = generateWeapon()
+          for (let i = 0; i < 50 && nw.rarity !== target; i++) nw = generateWeapon()
+          if (nw.rarity !== target) nw = { ...nw, rarity: target }
+          const row: any = await saveWeapon(nw, wallet)
+          const refreshed = await loadWeapons(wallet)
+          setWeapons(refreshed)
+          setLastForged({
+            ...nw,
+            id: row?.id ?? nw.id,
+          })
+          return
+        }
+      } catch {
+        // ignore
+      }
+
+      // Fallback: server (fid)
       if (fid) {
         const res = await fetch('/api/weapons/merge', {
           method: 'POST',
