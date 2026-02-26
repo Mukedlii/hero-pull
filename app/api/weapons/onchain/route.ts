@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
   const rpcUrl =
     process.env.BASE_RPC_URL ||
     process.env.NEXT_PUBLIC_BASE_RPC_URL ||
-    "https://rpc.ankr.com/base"
+    "https://base-rpc.publicnode.com"
 
   const client = createPublicClient({
     chain: base,

@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'missing/invalid address' }, { status: 400 })
     }
 
-    const rpcUrl = 'https://rpc.ankr.com/base'
+    const rpcUrl = 'https://base-rpc.publicnode.com'
 
     const client = createPublicClient({
       chain: base,
