@@ -252,6 +252,81 @@ function heroImg(seed,size=64){
   return `<img src="https://api.dicebear.com/7.x/adventurer/png?seed=${seed}&size=${size}" style="width:${size}px;height:${size}px;border-radius:8px;image-rendering:auto;display:block;" />`;
 }
 
+function seedFromName(name){
+  return String(name||'Hero').replace(/\s+/g,'');
+}
+
+function rarityColor(r){
+  const x=String(r||'common').toLowerCase();
+  if(x==='legendary') return '#ffd700';
+  if(x==='epic') return '#c084fc';
+  if(x==='rare') return '#60a5fa';
+  return '#9ca3af';
+}
+
+function hpFromStats(atk,def){
+  const v = 70 + Math.floor(def*1.1) + Math.floor(atk*0.35);
+  return Math.max(60, Math.min(220, v));
+}
+
+async function openMint(){
+  const frameUrl='https://hero-pull.vercel.app';
+  try{
+    const mod = await import('https://esm.sh/@farcaster/frame-sdk');
+    const sdk = mod?.default || mod?.sdk;
+    if(sdk?.actions?.openUrl){
+      await sdk.actions.openUrl(frameUrl);
+      return;
+    }
+  }catch{}
+  window.location.href = frameUrl;
+}
+
+async function getWalletAddress(){
+  try{
+    const p = await getEthProvider();
+    if(!p) return null;
+    const accounts = await p.request({ method:'eth_accounts' });
+    return accounts && accounts[0] ? accounts[0] : null;
+  }catch{ return null; }
+}
+
+async function loadOwnedHeroes(){
+  const addr = await getWalletAddress();
+  if(!addr) return [];
+
+  const owned = await fetch(`/api/nft/owned?address=${encodeURIComponent(addr)}`, { cache:'no-store' })
+    .then(r=>r.json())
+    .catch(()=>null);
+
+  const tokenIds = Array.isArray(owned?.tokenIds) ? owned.tokenIds : [];
+  if(!tokenIds.length) return [];
+
+  const rows = await Promise.all(tokenIds.map(async (id)=>{
+    try{
+      const j = await fetch(`/api/nft/hero/${id}`, { cache:'no-store' }).then(r=>r.json());
+      const h = j?.hero;
+      if(!h) return null;
+      const atk=Number(h.attack)||0;
+      const def=Number(h.defense)||0;
+      const spd=Number(h.speed)||0;
+      const rarity=String(h.rarity||'common').toLowerCase();
+      return {
+        tokenId: String(id),
+        name: h.name,
+        rarity,
+        seed: seedFromName(h.name),
+        atk, def, spd,
+        hp: hpFromStats(atk,def),
+        power: h.power || '—',
+        color: rarityColor(rarity),
+      };
+    }catch{ return null; }
+  }));
+
+  return rows.filter(Boolean);
+}
+
 const HEROES = [
   {name:'Shadow Viper',rarity:'common',seed:'ShadowViper',atk:38,def:22,spd:42,hp:80,power:'Poison Fang',color:'#9ca3af'},
   {name:'Iron Fist',rarity:'common',seed:'IronFist',atk:42,def:32,spd:26,hp:90,power:'Power Smash',color:'#9ca3af'},
@@ -327,12 +402,30 @@ window.onload = () => {
 // ═══ HERO SELECT ═══
 let selHero = null;
 
-function goSelect() {
+async function goSelect() {
   selHero = null;
   const sb = document.getElementById('start-btn');
   sb.disabled=true; sb.style.opacity='.4';
-  const picks = [...HEROES].sort(()=>Math.random()-.5).slice(0,3);
+
   const wrap = document.getElementById('hero-cards');
+  wrap.innerHTML='<div style="font-size:7px;color:#888;text-align:center;width:100%">Loading your NFT heroes…</div>';
+
+  let list = [];
+  try{ list = await loadOwnedHeroes(); }catch{ list = []; }
+
+  // If no wallet/no heroes: prompt mint
+  if(!list.length){
+    wrap.innerHTML=`
+      <div class="box" style="border-color:#60a5fa;text-align:center">
+        <div style="font-size:8px;color:#60a5fa">No NFT heroes found</div>
+        <div style="font-size:6px;color:#777;margin-top:6px;line-height:2">Connect a wallet & mint your first Hero to play Dungeon Run.</div>
+        <button class="btn btn-gold" style="margin-top:10px;font-size:8px;padding:10px;width:100%" onclick="openMint()">⛓ MINT HERO</button>
+      </div>`;
+    showScr('hero-select');
+    return;
+  }
+
+  const picks = [...list].sort(()=>Math.random()-.5).slice(0,3);
   wrap.innerHTML='';
   picks.forEach((h,i)=>{
     const d=document.createElement('div');
@@ -340,12 +433,13 @@ function goSelect() {
     d.className=`hcard ${rc}`;
     d.onclick=()=>selCard(i,h,d);
     d.innerHTML=`
-      <div class="hcard-rarity" style="color:${h.color}">${h.rarity.toUpperCase()}</div>
+      <div class="hcard-rarity" style="color:${h.color}">${String(h.rarity).toUpperCase()}</div>
       <img src="https://api.dicebear.com/7.x/adventurer/png?seed=${h.seed}&size=64" style="width:56px;height:56px;border-radius:8px;margin:4px auto;display:block;animation:floatY 2s ease-in-out infinite;" />
       <div class="hcard-name">${h.name}</div>
       <div class="hcard-stats">❤️${h.hp} ⚔️${h.atk}<br>🛡️${h.def} ⚡${h.spd}<br>✨${h.power}</div>`;
     wrap.appendChild(d);
   });
+
   showScr('hero-select');
 }
 
