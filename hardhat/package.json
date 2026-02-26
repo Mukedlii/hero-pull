@@ -4,7 +4,8 @@
   "version": "0.0.1",
   "scripts": {
     "compile": "hardhat compile",
-    "deploy:base": "hardhat run --network base scripts/deploy.js"
+    "deploy:base": "hardhat run --network base scripts/deploy.js",
+    "deploy:weapon:base": "hardhat run --network base scripts/deploy-weapon.js"
   },
   "dependencies": {
     "@openzeppelin/contracts": "^5.0.2"
