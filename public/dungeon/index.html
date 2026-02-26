@@ -802,10 +802,18 @@ async function mintVic(){
     const valueHex = '0x' + BigInt('200000000000000').toString(16);
     const chainIdHex = '0x' + Number(8453).toString(16);
 
+    // Warpcast provider often requires explicit `from`
+    let from = null;
+    try{
+      const accounts = await p.request({ method:'eth_accounts' });
+      from = accounts && accounts[0] ? accounts[0] : null;
+    }catch{}
+
     await p.request({
       method:'eth_sendTransaction',
       params:[{
         chainId: chainIdHex,
+        from,
         to:'0xa782922Ff9c54F4264FD049189eC66940f528Eb0',
         value: valueHex,
       }]
