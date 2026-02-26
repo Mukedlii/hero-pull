@@ -7,9 +7,9 @@ const CONTRACT = '0xA728A918A767bB085D4ac895b8F2d2AbD0dE27bB' as const
 // Base RPC often limits eth_getLogs ranges (e.g. 10,000 blocks). We'll scan in chunks.
 const LOG_CHUNK_SIZE = 9_000n
 
-// Set to the HeroPull contract deploy block for fast scans.
-// If unset, defaults near the observed earliest mints.
-const HERO_CONTRACT_DEPLOY_BLOCK = BigInt(process.env.HERO_CONTRACT_DEPLOY_BLOCK || "42600000")
+// HeroPull contract deploy/early mint block (Base). Must be <= first mint.
+// (Observed mints around ~42622992.)
+const HERO_CONTRACT_DEPLOY_BLOCK = 42_620_000n
 
 const abi = parseAbi([
   'event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)',
