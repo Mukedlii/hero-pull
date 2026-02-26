@@ -3,9 +3,10 @@
 import { useEffect, useMemo, useState } from "react"
 import { Weapon, WeaponRarity, generateWeapon, nextWeaponRarity } from "@/lib/weapons"
 import { getWalletAddress, loadWeapons, saveWeapon } from "@/lib/db"
+import { encodeFunctionData } from "viem"
 import {
   BASE_CHAIN_ID_HEX,
-  encodeMintWeaponCalldata,
+  WEAPON_ABI,
   WEAPON_CONTRACT_ADDRESS,
   WEAPON_MINT_PRICE_WEI_HEX,
 } from "@/lib/weaponContract"
@@ -28,6 +29,28 @@ export default function WeaponsPage() {
 
   useEffect(() => {
     ;(async () => {
+      // Prefer onchain inventory when wallet connected
+      try {
+        const wallet = await getWalletAddress()
+        if (wallet) {
+          const res = await fetch(`/api/weapons/onchain?address=${wallet}`, { cache: "no-store" })
+          const json = await res.json()
+          const items = Array.isArray(json?.items) ? json.items : []
+          const list: Weapon[] = []
+          for (const it of items) {
+            const qty = Number(it?.balance || 0)
+            const w = it?.weapon as Weapon
+            if (w && qty > 0) {
+              for (let i = 0; i < qty; i++) list.push({ ...w, id: `${w.id}-${i}` })
+            }
+          }
+          setWeapons(list)
+          return
+        }
+      } catch {
+        // ignore
+      }
+
       // Prefer Supabase inventory if wallet connected
       try {
         const wallet = await getWalletAddress()
@@ -228,9 +251,13 @@ export default function WeaponsPage() {
                 const provider = mod?.default?.wallet?.ethProvider ?? mod?.sdk?.wallet?.ethProvider ?? (window as any).ethereum
                 if (!provider) throw new Error("No wallet provider")
 
-                // tokenId v0: rarity bucket + type (simple random) => 1..5 common etc.
+                // tokenId v0: 1..5 templates
                 const tokenId = BigInt(Math.floor(Math.random() * 5) + 1)
-                const data = encodeMintWeaponCalldata(tokenId, 1n)
+                const data = encodeFunctionData({
+                  abi: WEAPON_ABI,
+                  functionName: "mint",
+                  args: [tokenId, 1n],
+                })
 
                 const accounts = await provider.request({ method: "eth_accounts" })
                 const from = accounts?.[0]
@@ -247,6 +274,22 @@ export default function WeaponsPage() {
                     },
                   ],
                 })
+
+                // refresh onchain inventory
+                try {
+                  const res = await fetch(`/api/weapons/onchain?address=${from}`, { cache: "no-store" })
+                  const json = await res.json()
+                  const items = Array.isArray(json?.items) ? json.items : []
+                  const list: Weapon[] = []
+                  for (const it of items) {
+                    const qty = Number(it?.balance || 0)
+                    const w = it?.weapon as Weapon
+                    if (w && qty > 0) {
+                      for (let i = 0; i < qty; i++) list.push({ ...w, id: `${w.id}-${i}` })
+                    }
+                  }
+                  setWeapons(list)
+                } catch {}
               } finally {
                 setMinting(false)
               }
