@@ -279,7 +279,8 @@ async function openMint(){
       return;
     }
   }catch{}
-  window.location.href = frameUrl;
+  // fallback
+  window.open(frameUrl,'_blank');
 }
 
 async function getWalletAddress(){
@@ -407,21 +408,28 @@ async function goSelect() {
   const sb = document.getElementById('start-btn');
   sb.disabled=true; sb.style.opacity='.4';
 
+  // Show hero select immediately so user sees progress
+  showScr('hero-select');
+
   const wrap = document.getElementById('hero-cards');
   wrap.innerHTML='<div style="font-size:7px;color:#888;text-align:center;width:100%">Loading your NFT heroes…</div>';
 
   let list = [];
-  try{ list = await loadOwnedHeroes(); }catch{ list = []; }
+  try{
+    const timeout = new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')), 6000));
+    list = await Promise.race([loadOwnedHeroes(), timeout]);
+  }catch{
+    list = [];
+  }
 
-  // If no wallet/no heroes: prompt mint
   if(!list.length){
     wrap.innerHTML=`
       <div class="box" style="border-color:#60a5fa;text-align:center">
-        <div style="font-size:8px;color:#60a5fa">No NFT heroes found</div>
-        <div style="font-size:6px;color:#777;margin-top:6px;line-height:2">Connect a wallet & mint your first Hero to play Dungeon Run.</div>
-        <button class="btn btn-gold" style="margin-top:10px;font-size:8px;padding:10px;width:100%" onclick="openMint()">⛓ MINT HERO</button>
+        <div style="font-size:8px;color:#60a5fa">Couldn't load NFT heroes</div>
+        <div style="font-size:6px;color:#777;margin-top:6px;line-height:2">Make sure wallet is connected in Warpcast. If you already minted, try again.</div>
+        <button class="btn btn-gold" style="margin-top:10px;font-size:8px;padding:10px;width:100%" onclick="goSelect()">🔄 RETRY</button>
+        <button class="btn btn-blue" style="margin-top:6px;font-size:8px;padding:10px;width:100%" onclick="openMint()">⛓ MINT HERO</button>
       </div>`;
-    showScr('hero-select');
     return;
   }
 
@@ -439,8 +447,6 @@ async function goSelect() {
       <div class="hcard-stats">❤️${h.hp} ⚔️${h.atk}<br>🛡️${h.def} ⚡${h.spd}<br>✨${h.power}</div>`;
     wrap.appendChild(d);
   });
-
-  showScr('hero-select');
 }
 
 function selCard(i,h,el){
