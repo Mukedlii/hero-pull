@@ -28,6 +28,7 @@ export default function WeaponsPage() {
   const [fid, setFid] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
   const [minting, setMinting] = useState(false)
+  const [wallet, setWallet] = useState<string | null>(null)
 
   useEffect(() => {
     ;(async () => {
@@ -35,6 +36,7 @@ export default function WeaponsPage() {
       try {
         const wallet = await getWalletAddress()
         if (wallet) {
+          setWallet(wallet)
           const res = await fetch(`/api/weapons/onchain?address=${wallet}`, { cache: "no-store" })
           const json = await res.json()
           const items = Array.isArray(json?.items) ? json.items : []
@@ -244,94 +246,98 @@ export default function WeaponsPage() {
       )
 
       <div className="mt-6 flex flex-col items-center gap-3">
-        <button
-          onClick={handleForge}
-          disabled={loading}
-          className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-bold py-3 px-6 rounded-2xl"
-        >
-          {loading ? "Working…" : "🎲 Forge Weapon (offchain)"}
-        </button>
-
         {WEAPON_CONTRACT_ADDRESS && (
-          <>
-            <button
-              onClick={async () => {
-                if (!WEAPON_CONTRACT_ADDRESS) return
-                setMinting(true)
+          <button
+            onClick={async () => {
+              if (!WEAPON_CONTRACT_ADDRESS) return
+              setMinting(true)
+              try {
+                const mod: any = await import("@farcaster/frame-sdk")
+                const provider =
+                  mod?.default?.wallet?.ethProvider ?? mod?.sdk?.wallet?.ethProvider ?? (window as any).ethereum
+                if (!provider) throw new Error("No wallet provider")
+
+                const tokenId = BigInt(Math.floor(Math.random() * 5) + 1)
+                const data = encodeFunctionData({
+                  abi: WEAPON_ABI,
+                  functionName: "mint",
+                  args: [tokenId, 1n],
+                })
+
                 try {
-                  const mod: any = await import("@farcaster/frame-sdk")
-                  const provider =
-                    mod?.default?.wallet?.ethProvider ?? mod?.sdk?.wallet?.ethProvider ?? (window as any).ethereum
-                  if (!provider) throw new Error("No wallet provider")
+                  await provider.request({ method: "eth_requestAccounts" })
+                } catch {}
 
-                  const tokenId = BigInt(Math.floor(Math.random() * 5) + 1)
-                  const data = encodeFunctionData({
-                    abi: WEAPON_ABI,
-                    functionName: "mint",
-                    args: [tokenId, 1n],
-                  })
+                const accounts = await provider.request({ method: "eth_accounts" })
+                const from = accounts?.[0]
+                if (!from) throw new Error("Wallet not connected")
 
-                  try {
-                    await provider.request({ method: "eth_requestAccounts" })
-                  } catch {}
+                const txHash = (await provider.request({
+                  method: "eth_sendTransaction",
+                  params: [
+                    {
+                      chainId: BASE_CHAIN_ID_HEX,
+                      from,
+                      to: WEAPON_CONTRACT_ADDRESS,
+                      data,
+                      value: WEAPON_MINT_PRICE_WEI_HEX,
+                    },
+                  ],
+                })) as string
 
-                  const accounts = await provider.request({ method: "eth_accounts" })
-                  const from = accounts?.[0]
-                  if (!from) throw new Error("Wallet not connected")
-
-                  const txHash = (await provider.request({
-                    method: "eth_sendTransaction",
-                    params: [
-                      {
-                        chainId: BASE_CHAIN_ID_HEX,
-                        from,
-                        to: WEAPON_CONTRACT_ADDRESS,
-                        data,
-                        value: WEAPON_MINT_PRICE_WEI_HEX,
-                      },
-                    ],
-                  })) as string
-
-                  // refresh onchain inventory (poll a bit; tx may not be mined yet)
-                  try {
-                    for (let attempt = 0; attempt < 8; attempt++) {
-                      const res = await fetch(`/api/weapons/onchain?address=${from}`, { cache: "no-store" })
-                      const json = await res.json()
-                      const items = Array.isArray(json?.items) ? json.items : []
-                      const list: Weapon[] = []
-                      let total = 0
-                      for (const it of items) {
-                        const qty = Number(it?.balance || 0)
-                        total += qty
-                        const w = it?.weapon as Weapon
-                        if (w && qty > 0) {
-                          for (let i = 0; i < qty; i++) list.push({ ...w, id: `${w.id}-${i}` })
-                        }
+                // refresh onchain inventory (poll a bit; tx may not be mined yet)
+                try {
+                  for (let attempt = 0; attempt < 8; attempt++) {
+                    const res = await fetch(`/api/weapons/onchain?address=${from}`, { cache: "no-store" })
+                    const json = await res.json()
+                    const items = Array.isArray(json?.items) ? json.items : []
+                    const list: Weapon[] = []
+                    let total = 0
+                    for (const it of items) {
+                      const qty = Number(it?.balance || 0)
+                      total += qty
+                      const w = it?.weapon as Weapon
+                      if (w && qty > 0) {
+                        for (let i = 0; i < qty; i++) list.push({ ...w, id: `${w.id}-${i}` })
                       }
-                      if (total > weapons.length) {
-                        setWeapons(list)
-                        if (items?.[0]?.weapon) setLastForged(items[0].weapon as Weapon)
-                        break
-                      }
-                      await new Promise((r) => setTimeout(r, 1200))
                     }
-                  } catch {}
+                    if (total > weapons.length) {
+                      setWeapons(list)
+                      if (items?.[0]?.weapon) setLastForged(items[0].weapon as Weapon)
+                      break
+                    }
+                    await new Promise((r) => setTimeout(r, 1200))
+                  }
+                } catch {}
 
-                  try {
-                    alert(`Mint sent! Tx: ${txHash}`)
-                  } catch {}
-                } finally {
-                  setMinting(false)
-                }
-              }}
-              disabled={minting}
-              className="bg-yellow-500 hover:bg-yellow-400 disabled:opacity-50 text-black font-extrabold py-3 px-6 rounded-2xl"
-            >
-              {minting ? "Minting…" : "⛓ Mint Weapon NFT (~$0.15)"}
-            </button>
+                try {
+                  alert(`Mint sent! Tx: ${txHash}`)
+                } catch {}
+              } finally {
+                setMinting(false)
+              }
+            }}
+            disabled={minting}
+            className="bg-yellow-500 hover:bg-yellow-400 disabled:opacity-50 text-black font-extrabold py-3 px-6 rounded-2xl"
+          >
+            {minting ? "Minting…" : "⛓ Mint Weapon NFT (~$0.15)"}
+          </button>
+        )}
 
-            {/* withdraw button removed */}
-          </>
+        {!wallet && (
+          <button
+            onClick={handleForge}
+            disabled={loading}
+            className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-bold py-3 px-6 rounded-2xl"
+          >
+            {loading ? "Working…" : "🎲 Forge Weapon (demo/offchain)"}
+          </button>
+        )}
+
+        {wallet && (
+          <p className="text-center text-xs text-gray-400">
+            Forge/Merge offchain demo disabled while wallet is connected. (Onchain merge coming soon.)
+          </p>
         )}
       </div>
 
@@ -356,10 +362,10 @@ export default function WeaponsPage() {
             {r !== "Legendary" && (
               <button
                 onClick={() => mergeRarity(r)}
-                disabled={!canMergeRarity(r)}
+                disabled={wallet ? true : !canMergeRarity(r)}
                 className="mt-2 w-full bg-yellow-600 hover:bg-yellow-500 disabled:opacity-40 text-white text-xs py-2 rounded-xl"
               >
-                Merge 3 → {nextWeaponRarity(r)}
+                {wallet ? "Onchain merge soon" : `Merge 3 → ${nextWeaponRarity(r)}`}
               </button>
             )}
           </div>
