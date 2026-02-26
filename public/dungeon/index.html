@@ -405,11 +405,11 @@ async function goSelect() {
   showScr('hero-select');
 
   const wrap = document.getElementById('hero-cards');
-  wrap.innerHTML='<div style="font-size:7px;color:#888;text-align:center;width:100%">Loading your NFT heroes…</div>';
+  wrap.innerHTML='<div style="font-size:7px;color:#888;text-align:center;width:100%">Loading your NFT heroes… (can take ~10-20s)</div>';
 
   let list = [];
   try{
-    const timeout = new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')), 6000));
+    const timeout = new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')), 25000));
     list = await Promise.race([loadOwnedHeroes(), timeout]);
   }catch{
     list = [];
