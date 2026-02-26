@@ -316,20 +316,10 @@ async function loadOwnedHeroes(){
   }
   if(!addr) return { addr: null, heroes: [], err: 'no_wallet' };
 
-  // Fast path: recent mints
-  let owned = await fetch(`/api/nft/owned?address=${encodeURIComponent(addr)}&lookback=5000`, { cache:'no-store' })
+  // Always use full owned scan (chunked server-side) so we don't miss older mints.
+  const owned = await fetch(`/api/nft/owned?address=${encodeURIComponent(addr)}`, { cache:'no-store' })
     .then(r=>r.json())
     .catch((e)=>({ error: String(e) }));
-
-  // If user minted earlier, fall back to full scan (chunked server-side)
-  try{
-    const tok = Array.isArray(owned?.tokenIds) ? owned.tokenIds : [];
-    if(tok.length < 3){
-      owned = await fetch(`/api/nft/owned?address=${encodeURIComponent(addr)}`, { cache:'no-store' })
-        .then(r=>r.json())
-        .catch((e)=>({ error: String(e) }));
-    }
-  }catch{}
 
   if(owned?.error) return { addr, heroes: [], err: owned.error };
 
