@@ -1,6 +1,6 @@
-export const WEAPON_CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_WEAPON_CONTRACT_ADDRESS as
-  | `0x${string}`
-  | undefined
+export const WEAPON_CONTRACT_ADDRESS =
+  (process.env.NEXT_PUBLIC_WEAPON_CONTRACT_ADDRESS as `0x${string}` | undefined) ??
+  ("0x0ca6D7c00d3f37CE9474B4a0b6814E6E124DC594" as const)
 
 export const WEAPON_MINT_PRICE_WEI_HEX = "0x" + BigInt("50000000000000").toString(16) // 0.00005 ETH
 export const BASE_CHAIN_ID_HEX = "0x2105" // 8453
