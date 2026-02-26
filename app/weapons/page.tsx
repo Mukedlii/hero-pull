@@ -3,6 +3,12 @@
 import { useEffect, useMemo, useState } from "react"
 import { Weapon, WeaponRarity, generateWeapon, nextWeaponRarity } from "@/lib/weapons"
 import { getWalletAddress, loadWeapons, saveWeapon } from "@/lib/db"
+import {
+  BASE_CHAIN_ID_HEX,
+  encodeMintWeaponCalldata,
+  WEAPON_CONTRACT_ADDRESS,
+  WEAPON_MINT_PRICE_WEI_HEX,
+} from "@/lib/weaponContract"
 
 const WEAPONS_KEY = "hero-pull-weapons"
 
@@ -18,6 +24,7 @@ export default function WeaponsPage() {
   const [lastForged, setLastForged] = useState<Weapon | null>(null)
   const [fid, setFid] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
+  const [minting, setMinting] = useState(false)
 
   useEffect(() => {
     ;(async () => {
@@ -202,14 +209,54 @@ export default function WeaponsPage() {
       <h1 className="text-2xl font-extrabold text-center mt-6">⚔️ Weapons</h1>
       <p className="text-center text-gray-400 mt-2 text-sm">Forge & merge weapons (local prototype)</p>
 
-      <div className="mt-6 flex justify-center">
+      <div className="mt-6 flex flex-col items-center gap-3">
         <button
           onClick={handleForge}
           disabled={loading}
           className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-bold py-3 px-6 rounded-2xl"
         >
-          {loading ? "Working…" : "🎲 Forge Weapon"}
+          {loading ? "Working…" : "🎲 Forge Weapon (offchain)"}
         </button>
+
+        {WEAPON_CONTRACT_ADDRESS && (
+          <button
+            onClick={async () => {
+              if (!WEAPON_CONTRACT_ADDRESS) return
+              setMinting(true)
+              try {
+                const mod: any = await import("@farcaster/frame-sdk")
+                const provider = mod?.default?.wallet?.ethProvider ?? mod?.sdk?.wallet?.ethProvider ?? (window as any).ethereum
+                if (!provider) throw new Error("No wallet provider")
+
+                // tokenId v0: rarity bucket + type (simple random) => 1..5 common etc.
+                const tokenId = BigInt(Math.floor(Math.random() * 5) + 1)
+                const data = encodeMintWeaponCalldata(tokenId, 1n)
+
+                const accounts = await provider.request({ method: "eth_accounts" })
+                const from = accounts?.[0]
+
+                await provider.request({
+                  method: "eth_sendTransaction",
+                  params: [
+                    {
+                      chainId: BASE_CHAIN_ID_HEX,
+                      from,
+                      to: WEAPON_CONTRACT_ADDRESS,
+                      data,
+                      value: WEAPON_MINT_PRICE_WEI_HEX,
+                    },
+                  ],
+                })
+              } finally {
+                setMinting(false)
+              }
+            }}
+            disabled={minting}
+            className="bg-yellow-500 hover:bg-yellow-400 disabled:opacity-50 text-black font-extrabold py-3 px-6 rounded-2xl"
+          >
+            {minting ? "Minting…" : "⛓ Mint Weapon NFT (~$0.15)"}
+          </button>
+        )}
       </div>
 
       {lastForged && (
