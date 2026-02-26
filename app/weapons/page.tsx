@@ -11,6 +11,8 @@ import {
   WEAPON_MINT_PRICE_WEI_HEX,
 } from "@/lib/weaponContract"
 
+const WEAPON_OWNER = "0xa782922Ff9c54F4264FD049189eC66940f528Eb0" as const
+
 const WEAPONS_KEY = "hero-pull-weapons"
 
 const rarityBorder: Record<WeaponRarity, string> = {
@@ -26,6 +28,7 @@ export default function WeaponsPage() {
   const [fid, setFid] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
   const [minting, setMinting] = useState(false)
+  const [withdrawing, setWithdrawing] = useState(false)
 
   useEffect(() => {
     ;(async () => {
@@ -242,77 +245,125 @@ export default function WeaponsPage() {
         </button>
 
         {WEAPON_CONTRACT_ADDRESS && (
-          <button
-            onClick={async () => {
-              if (!WEAPON_CONTRACT_ADDRESS) return
-              setMinting(true)
-              try {
-                const mod: any = await import("@farcaster/frame-sdk")
-                const provider = mod?.default?.wallet?.ethProvider ?? mod?.sdk?.wallet?.ethProvider ?? (window as any).ethereum
-                if (!provider) throw new Error("No wallet provider")
-
-                // tokenId v0: 1..5 templates
-                const tokenId = BigInt(Math.floor(Math.random() * 5) + 1)
-                const data = encodeFunctionData({
-                  abi: WEAPON_ABI,
-                  functionName: "mint",
-                  args: [tokenId, 1n],
-                })
-
-                // ensure accounts
+          <>
+            <button
+              onClick={async () => {
+                if (!WEAPON_CONTRACT_ADDRESS) return
+                setMinting(true)
                 try {
-                  await provider.request({ method: "eth_requestAccounts" })
-                } catch {
-                  // ignore
-                }
+                  const mod: any = await import("@farcaster/frame-sdk")
+                  const provider =
+                    mod?.default?.wallet?.ethProvider ?? mod?.sdk?.wallet?.ethProvider ?? (window as any).ethereum
+                  if (!provider) throw new Error("No wallet provider")
 
-                const accounts = await provider.request({ method: "eth_accounts" })
-                const from = accounts?.[0]
-                if (!from) throw new Error("Wallet not connected")
+                  const tokenId = BigInt(Math.floor(Math.random() * 5) + 1)
+                  const data = encodeFunctionData({
+                    abi: WEAPON_ABI,
+                    functionName: "mint",
+                    args: [tokenId, 1n],
+                  })
 
-                const txHash = (await provider.request({
-                  method: "eth_sendTransaction",
-                  params: [
-                    {
-                      chainId: BASE_CHAIN_ID_HEX,
-                      from,
-                      to: WEAPON_CONTRACT_ADDRESS,
-                      data,
-                      value: WEAPON_MINT_PRICE_WEI_HEX,
-                    },
-                  ],
-                })) as string
+                  try {
+                    await provider.request({ method: "eth_requestAccounts" })
+                  } catch {}
 
-                // refresh onchain inventory
-                try {
-                  const res = await fetch(`/api/weapons/onchain?address=${from}`, { cache: "no-store" })
-                  const json = await res.json()
-                  const items = Array.isArray(json?.items) ? json.items : []
-                  const list: Weapon[] = []
-                  for (const it of items) {
-                    const qty = Number(it?.balance || 0)
-                    const w = it?.weapon as Weapon
-                    if (w && qty > 0) {
-                      for (let i = 0; i < qty; i++) list.push({ ...w, id: `${w.id}-${i}` })
+                  const accounts = await provider.request({ method: "eth_accounts" })
+                  const from = accounts?.[0]
+                  if (!from) throw new Error("Wallet not connected")
+
+                  const txHash = (await provider.request({
+                    method: "eth_sendTransaction",
+                    params: [
+                      {
+                        chainId: BASE_CHAIN_ID_HEX,
+                        from,
+                        to: WEAPON_CONTRACT_ADDRESS,
+                        data,
+                        value: WEAPON_MINT_PRICE_WEI_HEX,
+                      },
+                    ],
+                  })) as string
+
+                  try {
+                    const res = await fetch(`/api/weapons/onchain?address=${from}`, { cache: "no-store" })
+                    const json = await res.json()
+                    const items = Array.isArray(json?.items) ? json.items : []
+                    const list: Weapon[] = []
+                    for (const it of items) {
+                      const qty = Number(it?.balance || 0)
+                      const w = it?.weapon as Weapon
+                      if (w && qty > 0) {
+                        for (let i = 0; i < qty; i++) list.push({ ...w, id: `${w.id}-${i}` })
+                      }
                     }
-                  }
-                  setWeapons(list)
-                  if (items?.[0]?.weapon) setLastForged(items[0].weapon as Weapon)
-                } catch {}
+                    setWeapons(list)
+                    if (items?.[0]?.weapon) setLastForged(items[0].weapon as Weapon)
+                  } catch {}
 
-                // show tx
+                  try {
+                    alert(`Mint sent! Tx: ${txHash}`)
+                  } catch {}
+                } finally {
+                  setMinting(false)
+                }
+              }}
+              disabled={minting}
+              className="bg-yellow-500 hover:bg-yellow-400 disabled:opacity-50 text-black font-extrabold py-3 px-6 rounded-2xl"
+            >
+              {minting ? "Minting…" : "⛓ Mint Weapon NFT (~$0.15)"}
+            </button>
+
+            <button
+              onClick={async () => {
+                if (!WEAPON_CONTRACT_ADDRESS) return
+                setWithdrawing(true)
                 try {
-                  alert(`Mint sent! Tx: ${txHash}`)
-                } catch {}
-              } finally {
-                setMinting(false)
-              }
-            }}
-            disabled={minting}
-            className="bg-yellow-500 hover:bg-yellow-400 disabled:opacity-50 text-black font-extrabold py-3 px-6 rounded-2xl"
-          >
-            {minting ? "Minting…" : "⛓ Mint Weapon NFT (~$0.15)"}
-          </button>
+                  const mod: any = await import("@farcaster/frame-sdk")
+                  const provider =
+                    mod?.default?.wallet?.ethProvider ?? mod?.sdk?.wallet?.ethProvider ?? (window as any).ethereum
+                  if (!provider) throw new Error("No wallet provider")
+
+                  try {
+                    await provider.request({ method: "eth_requestAccounts" })
+                  } catch {}
+
+                  const accounts = await provider.request({ method: "eth_accounts" })
+                  const from = accounts?.[0]
+                  if (!from) throw new Error("Wallet not connected")
+                  if (String(from).toLowerCase() !== WEAPON_OWNER.toLowerCase()) {
+                    alert("Only owner can withdraw")
+                    return
+                  }
+
+                  const data = encodeFunctionData({
+                    abi: WEAPON_ABI,
+                    functionName: "withdraw",
+                    args: [WEAPON_OWNER],
+                  })
+
+                  const txHash = (await provider.request({
+                    method: "eth_sendTransaction",
+                    params: [
+                      {
+                        chainId: BASE_CHAIN_ID_HEX,
+                        from,
+                        to: WEAPON_CONTRACT_ADDRESS,
+                        data,
+                      },
+                    ],
+                  })) as string
+
+                  alert(`Withdraw sent! Tx: ${txHash}`)
+                } finally {
+                  setWithdrawing(false)
+                }
+              }}
+              disabled={withdrawing}
+              className="bg-gray-800 hover:bg-gray-700 disabled:opacity-50 text-white font-bold py-2 px-6 rounded-2xl"
+            >
+              {withdrawing ? "Withdrawing…" : "💸 Withdraw mint fees (owner)"}
+            </button>
+          </>
         )}
       </div>
 

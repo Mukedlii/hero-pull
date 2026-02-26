@@ -26,4 +26,11 @@ export const WEAPON_ABI = [
     ],
     outputs: [{ name: "balances", type: "uint256[]" }],
   },
+  {
+    type: "function",
+    name: "withdraw",
+    stateMutability: "nonpayable",
+    inputs: [{ name: "to", type: "address" }],
+    outputs: [],
+  },
 ] as const
