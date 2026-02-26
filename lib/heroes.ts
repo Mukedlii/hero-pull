@@ -129,12 +129,30 @@ function generateStatForRarity(rarity: Hero['rarity']): number {
   return Math.floor(Math.random() * (max - min + 1)) + min
 }
 
+export const HEROES: Hero[] = names.map((name, i) => {
+  const power = powers[i % powers.length]
+  const filename = name.toLowerCase().replace(/ /g, "_") + ".png"
+  const imageUrl = `/heroes/${filename}`
+  return {
+    name,
+    gender: "Unknown",
+    power,
+    rarity: "Common",
+    imageUrl,
+    attack: 10,
+    defense: 10,
+    speed: 10,
+    xp: 0,
+    level: 1,
+  }
+})
+
 export function generateHero(): Hero {
   const name = names[Math.floor(Math.random() * names.length)]
   const gender = genders[Math.floor(Math.random() * genders.length)]
   const power = powers[Math.floor(Math.random() * powers.length)]
   const rarity = generateRarity()
-  const filename = name.toLowerCase().replace(/ /g, '_') + '.png'
+  const filename = name.toLowerCase().replace(/ /g, "_") + ".png"
   const imageUrl = `/heroes/${filename}`
   return {
     name,
