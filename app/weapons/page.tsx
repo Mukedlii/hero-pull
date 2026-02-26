@@ -15,26 +15,75 @@ const rarityBorder: Record<WeaponRarity, string> = {
 export default function WeaponsPage() {
   const [weapons, setWeapons] = useState<Weapon[]>([])
   const [lastForged, setLastForged] = useState<Weapon | null>(null)
+  const [fid, setFid] = useState<number | null>(null)
+  const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(WEAPONS_KEY)
-      setWeapons(raw ? (JSON.parse(raw) as Weapon[]) : [])
-    } catch {
-      setWeapons([])
-    }
+    ;(async () => {
+      try {
+        const mod: any = await import("@farcaster/frame-sdk")
+        const ctx: any = await mod?.sdk?.context
+        const f = ctx?.user?.fid
+        if (f) setFid(f)
+
+        // Prefer server inventory if fid exists
+        if (f) {
+          const res = await fetch(`/api/weapons/list?fid=${f}`, { cache: "no-store" })
+          const json = await res.json()
+          const items = Array.isArray(json?.items) ? json.items : []
+          setWeapons(items.map((it: any) => it.weapon as Weapon))
+          return
+        }
+      } catch {
+        // ignore
+      }
+
+      // fallback: localStorage
+      try {
+        const raw = localStorage.getItem(WEAPONS_KEY)
+        setWeapons(raw ? (JSON.parse(raw) as Weapon[]) : [])
+      } catch {
+        setWeapons([])
+      }
+    })()
   }, [])
 
-  const save = (list: Weapon[]) => {
+  const saveLocal = (list: Weapon[]) => {
     setWeapons(list)
     localStorage.setItem(WEAPONS_KEY, JSON.stringify(list))
   }
 
-  const handleForge = () => {
-    const w = generateWeapon()
-    const next = [w, ...weapons]
-    save(next)
-    setLastForged(w)
+  const refreshServer = async (f: number) => {
+    const res = await fetch(`/api/weapons/list?fid=${f}`, { cache: "no-store" })
+    const json = await res.json()
+    const items = Array.isArray(json?.items) ? json.items : []
+    setWeapons(items.map((it: any) => it.weapon as Weapon))
+  }
+
+  const handleForge = async () => {
+    setLoading(true)
+    try {
+      if (fid) {
+        const res = await fetch('/api/weapons/forge', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ fid }),
+        })
+        const json = await res.json()
+        const w = json?.item?.weapon as Weapon
+        if (w) setLastForged(w)
+        await refreshServer(fid)
+        return
+      }
+
+      // fallback local
+      const w = generateWeapon()
+      const next = [w, ...weapons]
+      saveLocal(next)
+      setLastForged(w)
+    } finally {
+      setLoading(false)
+    }
   }
 
   const counts = useMemo(() => {
@@ -45,33 +94,43 @@ export default function WeaponsPage() {
 
   const canMergeRarity = (r: WeaponRarity) => (r === "Legendary" ? false : counts[r] >= 3)
 
-  const mergeRarity = (r: WeaponRarity) => {
+  const mergeRarity = async (r: WeaponRarity) => {
     if (!canMergeRarity(r)) return
-    const target = nextWeaponRarity(r)
-
-    // remove 3 of rarity r
-    const nextList: Weapon[] = []
-    let removed = 0
-    for (const w of weapons) {
-      if (w.rarity === r && removed < 3) {
-        removed++
-        continue
+    setLoading(true)
+    try {
+      if (fid) {
+        const res = await fetch('/api/weapons/merge', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ fid, rarity: r }),
+        })
+        const json = await res.json()
+        const w = json?.item?.weapon as Weapon
+        if (w) setLastForged(w)
+        await refreshServer(fid)
+        return
       }
-      nextList.push(w)
-    }
 
-    // forge 1 of target rarity (deterministic name/bonuses based on our generator)
-    let nw = generateWeapon()
-    // override rarity to target and recompute bonuses/name by generating until match (simple prototype)
-    // (keeps distribution simple without extra code)
-    for (let i = 0; i < 50 && nw.rarity !== target; i++) nw = generateWeapon()
-    if (nw.rarity !== target) {
-      // hard override if we didn't hit target in 50 tries
-      nw = { ...nw, rarity: target }
+      // fallback local merge
+      const target = nextWeaponRarity(r)
+      const nextList: Weapon[] = []
+      let removed = 0
+      for (const w of weapons) {
+        if (w.rarity === r && removed < 3) {
+          removed++
+          continue
+        }
+        nextList.push(w)
+      }
+      let nw = generateWeapon()
+      for (let i = 0; i < 50 && nw.rarity !== target; i++) nw = generateWeapon()
+      if (nw.rarity !== target) nw = { ...nw, rarity: target }
+      const next = [nw, ...nextList]
+      saveLocal(next)
+      setLastForged(nw)
+    } finally {
+      setLoading(false)
     }
-
-    save([nw, ...nextList])
-    setLastForged(nw)
   }
 
   return (
@@ -82,9 +141,10 @@ export default function WeaponsPage() {
       <div className="mt-6 flex justify-center">
         <button
           onClick={handleForge}
-          className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 px-6 rounded-2xl"
+          disabled={loading}
+          className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-bold py-3 px-6 rounded-2xl"
         >
-          🎲 Forge Weapon
+          {loading ? "Working…" : "🎲 Forge Weapon"}
         </button>
       </div>
 
