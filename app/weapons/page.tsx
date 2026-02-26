@@ -259,10 +259,18 @@ export default function WeaponsPage() {
                   args: [tokenId, 1n],
                 })
 
+                // ensure accounts
+                try {
+                  await provider.request({ method: "eth_requestAccounts" })
+                } catch {
+                  // ignore
+                }
+
                 const accounts = await provider.request({ method: "eth_accounts" })
                 const from = accounts?.[0]
+                if (!from) throw new Error("Wallet not connected")
 
-                await provider.request({
+                const txHash = (await provider.request({
                   method: "eth_sendTransaction",
                   params: [
                     {
@@ -273,7 +281,7 @@ export default function WeaponsPage() {
                       value: WEAPON_MINT_PRICE_WEI_HEX,
                     },
                   ],
-                })
+                })) as string
 
                 // refresh onchain inventory
                 try {
@@ -289,6 +297,12 @@ export default function WeaponsPage() {
                     }
                   }
                   setWeapons(list)
+                  if (items?.[0]?.weapon) setLastForged(items[0].weapon as Weapon)
+                } catch {}
+
+                // show tx
+                try {
+                  alert(`Mint sent! Tx: ${txHash}`)
                 } catch {}
               } finally {
                 setMinting(false)
