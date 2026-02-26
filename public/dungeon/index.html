@@ -270,18 +270,8 @@ function hpFromStats(atk,def){
 }
 
 async function openMint(){
-  const frameUrl='https://hero-pull.vercel.app';
-  // Launch frame inside Warpcast (avoids Safari)
-  const launchUrl = `https://warpcast.com/~/frames/launch?url=${encodeURIComponent(frameUrl)}`;
-  try{
-    const mod = await import('https://esm.sh/@farcaster/frame-sdk');
-    const sdk = mod?.default || mod?.sdk;
-    if(sdk?.actions?.openUrl){
-      await sdk.actions.openUrl(launchUrl);
-      return;
-    }
-  }catch{}
-  window.location.href = launchUrl;
+  // Navigate inside the same mini-app webview (stays in Warpcast)
+  window.location.href = '/';
 }
 
 async function getWalletAddress(){

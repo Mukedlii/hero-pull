@@ -4,8 +4,12 @@ import { base } from 'viem/chains'
 
 const CONTRACT = '0xA728A918A767bB085D4ac895b8F2d2AbD0dE27bB' as const
 
-// NOTE: Base RPC often limits eth_getLogs ranges (e.g. 10,000 blocks). Keep this small.
-const DEFAULT_LOOKBACK_BLOCKS = 5_000n
+// Base RPC often limits eth_getLogs ranges (e.g. 10,000 blocks). We'll scan in chunks.
+const LOG_CHUNK_SIZE = 9_000n
+
+// Set to the HeroPull contract deploy block for fast scans.
+// If unset, defaults near the observed earliest mints.
+const HERO_CONTRACT_DEPLOY_BLOCK = BigInt(process.env.HERO_CONTRACT_DEPLOY_BLOCK || "42600000")
 
 const abi = parseAbi([
   'event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)',
@@ -29,19 +33,24 @@ export async function GET(req: NextRequest) {
     })
 
     const latest = await client.getBlockNumber()
-    const fromBlock = latest > DEFAULT_LOOKBACK_BLOCKS ? latest - DEFAULT_LOOKBACK_BLOCKS : 0n
+    const fromBlock = HERO_CONTRACT_DEPLOY_BLOCK
 
     // Fetch Transfer logs TO address using topics (more robust than typed args on Vercel).
     const transferTopic =
       '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef'
     const toTopic = ('0x' + address.toLowerCase().slice(2).padStart(64, '0')) as `0x${string}`
 
-    const logs = await client.getLogs({
-      address: CONTRACT,
-      fromBlock,
-      toBlock: latest,
-      topics: [transferTopic, null, toTopic],
-    } as any)
+    const logs: any[] = []
+    for (let start = fromBlock; start <= latest; start += LOG_CHUNK_SIZE) {
+      const end = start + LOG_CHUNK_SIZE
+      const chunk = await client.getLogs({
+        address: CONTRACT,
+        fromBlock: start,
+        toBlock: end > latest ? latest : end,
+        topics: [transferTopic, null, toTopic],
+      } as any)
+      logs.push(...(chunk as any[]))
+    }
 
     const tokenIds = (logs as any[])
       .map((l) => {
