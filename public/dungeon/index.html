@@ -276,9 +276,13 @@ async function openMint(){
 
 async function getWalletAddress(){
   try{
+    const saved = localStorage.getItem('dungeon-wallet-override');
+    if(saved && saved.startsWith('0x') && saved.length===42) return saved;
+  }catch{}
+
+  try{
     const p = await getEthProvider();
     if(!p) return null;
-    // ensure connected in Warpcast
     try{ await p.request({ method:'eth_requestAccounts' }); }catch{}
     const accounts = await p.request({ method:'eth_accounts' });
     return accounts && accounts[0] ? accounts[0] : null;
@@ -287,14 +291,16 @@ async function getWalletAddress(){
 
 async function loadOwnedHeroes(){
   const addr = await getWalletAddress();
-  if(!addr) return [];
+  if(!addr) return { addr: null, heroes: [], err: 'no_wallet' };
 
   const owned = await fetch(`/api/nft/owned?address=${encodeURIComponent(addr)}&lookback=5000`, { cache:'no-store' })
     .then(r=>r.json())
-    .catch(()=>null);
+    .catch((e)=>({ error: String(e) }));
+
+  if(owned?.error) return { addr, heroes: [], err: owned.error };
 
   const tokenIds = Array.isArray(owned?.tokenIds) ? owned.tokenIds : [];
-  if(!tokenIds.length) return [];
+  if(!tokenIds.length) return { addr, heroes: [], err: 'no_tokens' };
 
   const rows = await Promise.all(tokenIds.map(async (id)=>{
     try{
@@ -318,7 +324,7 @@ async function loadOwnedHeroes(){
     }catch{ return null; }
   }));
 
-  return rows.filter(Boolean);
+  return { addr, heroes: rows.filter(Boolean), err: null };
 }
 
 const HEROES = [
@@ -407,19 +413,25 @@ async function goSelect() {
   const wrap = document.getElementById('hero-cards');
   wrap.innerHTML='<div style="font-size:7px;color:#888;text-align:center;width:100%">Loading your NFT heroes… (can take ~10-20s)</div>';
 
-  let list = [];
+  let res = null;
   try{
     const timeout = new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')), 25000));
-    list = await Promise.race([loadOwnedHeroes(), timeout]);
-  }catch{
-    list = [];
+    res = await Promise.race([loadOwnedHeroes(), timeout]);
+  }catch(e){
+    res = { addr: null, heroes: [], err: String(e?.message||e) };
   }
+
+  const addrTxt = res?.addr ? `${String(res.addr).slice(0,6)}…${String(res.addr).slice(-4)}` : '—';
+  const list = res?.heroes || [];
 
   if(!list.length){
     wrap.innerHTML=`
       <div class="box" style="border-color:#60a5fa;text-align:center">
         <div style="font-size:8px;color:#60a5fa">Couldn't load NFT heroes</div>
-        <div style="font-size:6px;color:#777;margin-top:6px;line-height:2">Make sure wallet is connected in Warpcast. If you already minted, try again.</div>
+        <div style="font-size:6px;color:#777;margin-top:6px;line-height:2">Detected wallet: <span style="color:#fff">${addrTxt}</span></div>
+        <div style="font-size:6px;color:#555;margin-top:6px;line-height:2">If this isn't the wallet you minted with, paste it below.</div>
+        <input id="addr-ovr" placeholder="0x..." style="margin-top:8px;width:100%;padding:10px;border:2px solid #333;background:#0a0a0f;color:#fff;font-size:7px;" />
+        <button class="btn btn-blue" style="margin-top:6px;font-size:8px;padding:10px;width:100%" onclick="(function(){var v=document.getElementById('addr-ovr').value||''; if(v.startsWith('0x')&&v.length===42){ localStorage.setItem('dungeon-wallet-override',v); goSelect(); } else { alert('Bad address'); }})()">✅ USE THIS ADDRESS</button>
         <button class="btn btn-gold" style="margin-top:10px;font-size:8px;padding:10px;width:100%" onclick="goSelect()">🔄 RETRY</button>
         <button class="btn btn-blue" style="margin-top:6px;font-size:8px;padding:10px;width:100%" onclick="openMint()">⛓ MINT HERO</button>
       </div>`;
