@@ -740,6 +740,7 @@ function acceptBless(){
 // ═══ END ═══
 function endGame(win){
   G.inBattle=false;
+  G.won = !!win;
   const prevHs=parseInt(localStorage.getItem('dungeon-hs')||'0');
   const prevDp=parseInt(localStorage.getItem('dungeon-dp')||'0');
   const isNew=G.score>prevHs;
@@ -767,7 +768,10 @@ function endGame(win){
 }
 
 async function doShare(){
-  const txt=`I just CLEARED the dungeon and defeated the final boss! 🏰🐉🔥⚔️✨🏆\n+100 points earned — feeling unstoppable 😎💪🚀\n\nCan you beat my run? 👇\nhttps://hero-pull.vercel.app/dungeon`;
+  const txt = G?.won
+    ? `I just CLEARED the dungeon and defeated the final boss! 🏰🐉🔥⚔️✨🏆\n+100 points earned — feeling unstoppable 😎💪🚀\n\nCan you beat my run? 👇\nhttps://hero-pull.vercel.app/dungeon`
+    : `I got absolutely DESTROYED in the dungeon… 😭💀🤕\nPlease help me beat the final boss — I need backup ASAP! 🏰🐉⚔️🙏\n\nPlay & try to defeat it for me 👇\nhttps://hero-pull.vercel.app/dungeon`;
+
   const url=`https://warpcast.com/~/compose?text=${encodeURIComponent(txt)}`;
 
   try{
