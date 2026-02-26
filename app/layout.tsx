@@ -50,6 +50,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <span className="text-2xl">⚔️</span>
               <span className="text-xs mt-1">Weapons</span>
             </a>
+            <a href="/dungeon" className="flex flex-col items-center text-cyan-400">
+              <span className="text-2xl">🏰</span>
+              <span className="text-xs">Dungeon</span>
+            </a>
             <a href="/stats" className="flex flex-col items-center text-green-400 hover:text-green-300">
               <span className="text-2xl">📊</span>
               <span className="text-xs mt-1">Stats</span>
