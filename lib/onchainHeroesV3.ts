@@ -13,8 +13,11 @@ export function heroFromSeedAndTier(seedBig: bigint, tokenId: bigint, tier: Tier
 
   const rarity = tierToRarity(tier)
 
-  const baseStat = 10 + Number(seedBig % 31n) // 10..40
-  const bump = tier === 3 ? 30 : tier === 2 ? 20 : tier === 1 ? 10 : 0
+  // Keep stat ordering strict by tier (so Legendary > Epic > Rare > Common)
+  // while still having some deterministic variance.
+  const roll = Number(seedBig % 16n) // 0..15
+  const tierMin = tier === 3 ? 40 : tier === 2 ? 30 : tier === 1 ? 20 : 10
+  const baseStat = tierMin + roll // Common 10..25, Rare 20..35, Epic 30..45, Legendary 40..55
 
   const level = 1 + Number(seedBig % 10n)
 
@@ -22,9 +25,9 @@ export function heroFromSeedAndTier(seedBig: bigint, tokenId: bigint, tier: Tier
     ...base,
     rarity,
     level,
-    attack: baseStat + bump,
-    defense: baseStat + bump,
-    speed: baseStat + bump,
+    attack: baseStat,
+    defense: baseStat,
+    speed: baseStat,
     power: base.power,
   }
 }
