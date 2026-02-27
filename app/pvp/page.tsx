@@ -175,6 +175,7 @@ export default function PvPPage() {
         .update({ p2_wallet: wallet })
         .eq("id", matchId)
       if (e2) throw e2
+      await loadMatch(matchId)
     } catch (e: any) {
       setErr(e?.message || String(e))
     } finally {
@@ -192,6 +193,7 @@ export default function PvPPage() {
       const patch = role === "p1" ? { p1_hero: pv } : { p2_hero: pv }
       const { error } = await supabase().from("pvp_matches").update(patch).eq("id", matchId)
       if (error) throw error
+      await loadMatch(matchId)
     } catch (e: any) {
       setErr(e?.message || String(e))
     } finally {
@@ -214,6 +216,7 @@ export default function PvPPage() {
         .update({ status: "active", state: st })
         .eq("id", matchId)
       if (error) throw error
+      await loadMatch(matchId)
     } catch (e: any) {
       setErr(e?.message || String(e))
     } finally {
@@ -232,6 +235,7 @@ export default function PvPPage() {
       const status = next.finished ? "finished" : "active"
       const { error } = await supabase().from("pvp_matches").update({ state: next, status }).eq("id", matchId)
       if (error) throw error
+      await loadMatch(matchId)
     } catch (e: any) {
       setErr(e?.message || String(e))
     } finally {
