@@ -13,6 +13,7 @@ export default function MigrationPanel() {
   const [v2, setV2] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  const [selectedV1, setSelectedV1] = useState<Set<string>>(new Set())
 
   const refresh = async (a: string) => {
     const v2Contract = HERO_PULL_V2_CONTRACT_ADDRESS
@@ -74,6 +75,16 @@ export default function MigrationPanel() {
     const s4 = new Set(v2) // v4 tokens
     return v1.filter((id) => !s4.has(id))
   }, [v1, v2])
+
+  // keep selection in sync with available tokens
+  useEffect(() => {
+    setSelectedV1((prev) => {
+      const next = new Set<string>()
+      const allowed = new Set(toClaimV1)
+      for (const id of prev) if (allowed.has(id)) next.add(id)
+      return next
+    })
+  }, [toClaimV1])
 
   const toClaimV2 = useMemo(() => {
     const s4 = new Set(v2)
@@ -139,19 +150,77 @@ export default function MigrationPanel() {
       {err && <div className="mt-3 text-xs text-red-400">{err}</div>}
 
       <div className="mt-4 text-sm font-bold">V1 → V4 to claim ({toClaimV1.length})</div>
+
       <div className="mt-2 grid grid-cols-4 gap-2">
-        {[1, 5, 10, 50].map((n) => (
-          <button
-            key={`v1-${n}`}
-            disabled={busy || toClaimV1.length === 0}
-            onClick={() => claimBatch(toClaimV1.slice(0, n), "v1")}
-            className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-xs py-2 rounded-xl"
-          >
-            {n === 50 ? "Claim max" : `Claim ${n}`}
-          </button>
-        ))}
+        <button
+          disabled={busy || toClaimV1.length === 0}
+          onClick={() => setSelectedV1(new Set(toClaimV1))}
+          className="bg-gray-800 hover:bg-gray-700 disabled:opacity-50 text-white text-xs py-2 rounded-xl"
+        >
+          Select all
+        </button>
+        <button
+          disabled={busy || selectedV1.size === 0}
+          onClick={() => setSelectedV1(new Set())}
+          className="bg-gray-800 hover:bg-gray-700 disabled:opacity-50 text-white text-xs py-2 rounded-xl"
+        >
+          Clear
+        </button>
+        <button
+          disabled={busy || toClaimV1.length === 0}
+          onClick={() => setSelectedV1(new Set(toClaimV1.slice(0, 5)))}
+          className="bg-gray-800 hover:bg-gray-700 disabled:opacity-50 text-white text-xs py-2 rounded-xl"
+        >
+          First 5
+        </button>
+        <button
+          disabled={busy || toClaimV1.length === 0}
+          onClick={() => setSelectedV1(new Set(toClaimV1.slice(0, 10)))}
+          className="bg-gray-800 hover:bg-gray-700 disabled:opacity-50 text-white text-xs py-2 rounded-xl"
+        >
+          First 10
+        </button>
       </div>
-      <div className="mt-1 text-[10px] text-gray-500">Batch sizes: 1 / 5 / 10 / max 50</div>
+
+      {toClaimV1.length > 0 && (
+        <div className="mt-3 max-h-48 overflow-auto rounded-xl border border-gray-800 bg-gray-950 p-2">
+          <div className="grid grid-cols-2 gap-2">
+            {toClaimV1.map((id) => {
+              const checked = selectedV1.has(id)
+              return (
+                <label
+                  key={id}
+                  className="flex items-center gap-2 rounded-lg border border-gray-800 bg-gray-900 px-2 py-2 text-xs text-gray-200"
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={(e) => {
+                      const on = e.target.checked
+                      setSelectedV1((prev) => {
+                        const next = new Set(prev)
+                        if (on) next.add(id)
+                        else next.delete(id)
+                        return next
+                      })
+                    }}
+                  />
+                  <span className="font-mono">#{id}</span>
+                </label>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      <button
+        disabled={busy || selectedV1.size === 0}
+        onClick={() => claimBatch(Array.from(selectedV1).slice(0, 50), "v1")}
+        className="mt-3 w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-xs py-2 rounded-xl"
+      >
+        Migrate selected V1 → V4 ({selectedV1.size}{selectedV1.size > 50 ? ", will do first 50" : ""})
+      </button>
+      <div className="mt-1 text-[10px] text-gray-500">Max 50 per tx.</div>
 
       <div className="mt-4 text-sm font-bold">V2 → V4 to claim ({toClaimV2.length})</div>
       <div className="mt-2 grid grid-cols-4 gap-2">
