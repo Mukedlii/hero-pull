@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from "react"
 import { encodeFunctionData } from "viem"
 import { HERO_PULL_V1_CONTRACT_ADDRESS } from "@/lib/heroPullContract"
-import { HERO_PULL_V2_ABI, HERO_PULL_V2_CONTRACT_ADDRESS } from "@/lib/heroPullV2Contract"
+import { HERO_PULL_V2_CONTRACT_ADDRESS } from "@/lib/heroPullV2Contract"
+import { HERO_PULL_V3_ABI, HERO_PULL_V3_CONTRACT_ADDRESS } from "@/lib/heroPullV3Contract"
 
 export default function MigrationPanel() {
   const [address, setAddress] = useState<string | null>(null)
@@ -13,16 +14,23 @@ export default function MigrationPanel() {
   const [err, setErr] = useState<string | null>(null)
 
   const refresh = async (a: string) => {
-    const [o1, o2] = await Promise.all([
-      fetch(`/api/nft/owned?address=${a}&fast=1`, { cache: "no-store" }).then((r) => r.json()),
-      fetch(`/api/wallet/heroes?owner=${a}`, { cache: "no-store" }).then((r) => r.json()),
+    const v2Contract = HERO_PULL_V2_CONTRACT_ADDRESS
+    const v3Contract = HERO_PULL_V3_CONTRACT_ADDRESS
+
+    const [o2, o3] = await Promise.all([
+      v2Contract
+        ? fetch(`/api/wallet/heroes?owner=${a}&contract=${v2Contract}`, { cache: "no-store" }).then((r) => r.json())
+        : Promise.resolve({ tokenIds: [] }),
+      v3Contract
+        ? fetch(`/api/wallet/heroes?owner=${a}&contract=${v3Contract}`, { cache: "no-store" }).then((r) => r.json())
+        : Promise.resolve({ tokenIds: [] }),
     ])
 
-    // V1: chain logs scan (fast=1)
-    setV1(Array.isArray(o1?.tokenIds) ? o1.tokenIds : [])
+    // v2 tokens
+    setV1(Array.isArray(o2?.tokenIds) ? o2.tokenIds : [])
 
-    // V2: Alchemy wallet lookup
-    setV2(Array.isArray(o2?.tokenIds) ? o2.tokenIds : [])
+    // v3 tokens
+    setV2(Array.isArray(o3?.tokenIds) ? o3.tokenIds : [])
   }
 
   useEffect(() => {
@@ -55,8 +63,8 @@ export default function MigrationPanel() {
   }, [v1, v2])
 
   const claimOne = async (tokenId: string) => {
-    if (!HERO_PULL_V2_CONTRACT_ADDRESS) {
-      alert("Missing V2 contract")
+    if (!HERO_PULL_V3_CONTRACT_ADDRESS) {
+      alert("Missing V3 contract")
       return
     }
     setBusy(true)
@@ -71,8 +79,8 @@ export default function MigrationPanel() {
       if (!from) throw new Error("Wallet not connected")
 
       const data = encodeFunctionData({
-        abi: HERO_PULL_V2_ABI,
-        functionName: "claimFromV1",
+        abi: HERO_PULL_V3_ABI,
+        functionName: "claimFromV2",
         args: [BigInt(tokenId)],
       })
 
@@ -82,7 +90,7 @@ export default function MigrationPanel() {
           {
             chainId: "0x2105",
             from,
-            to: HERO_PULL_V2_CONTRACT_ADDRESS,
+            to: HERO_PULL_V3_CONTRACT_ADDRESS,
             data,
           },
         ],

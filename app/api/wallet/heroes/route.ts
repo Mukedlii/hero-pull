@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { HERO_PULL_V2_CONTRACT_ADDRESS } from "@/lib/heroPullV2Contract"
+import { HERO_PULL_V3_CONTRACT_ADDRESS } from "@/lib/heroPullV3Contract"
 
 export const dynamic = "force-dynamic"
 export const revalidate = 0
@@ -22,7 +23,11 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "missing ALCHEMY_KEY" }, { status: 500 })
     }
 
-    const contract = HERO_PULL_V2_CONTRACT_ADDRESS
+    const contractParam = searchParams.get("contract")
+    const contract =
+      (contractParam && contractParam.startsWith("0x") && contractParam.length === 42
+        ? (contractParam as `0x${string}`)
+        : null) ?? (HERO_PULL_V3_CONTRACT_ADDRESS ?? HERO_PULL_V2_CONTRACT_ADDRESS)
     const url = `https://base-mainnet.g.alchemy.com/nft/v3/${key}/getNFTsForOwner?owner=${owner}&contractAddresses[]=${contract}&withMetadata=false&pageSize=100`
 
     const r = await fetch(url, { cache: "no-store" })
