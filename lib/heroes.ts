@@ -2,140 +2,151 @@ import type { EquippedItems } from "@/lib/items"
 
 export type Hero = {
   name: string
-  gender: 'Male' | 'Female' | 'Unknown'
-  power: string
-  rarity: 'Common' | 'Rare' | 'Epic' | 'Legendary'
+  gender: "Male" | "Female" | "Unknown"
+  /** Ability name (formerly `power`) */
+  ability: string
+  rarity: "Common" | "Rare" | "Epic" | "Legendary"
   imageUrl: string
-  attack: number
+
+  /** ❤️ Health (HP pool) */
+  health: number
+  /** ⚔️ Power (damage dealt) */
+  power: number
+  /** 🛡️ Defense (damage reduction) */
   defense: number
-  speed: number
+  /** 🍀 Luck (crit chance + drop rate) */
+  luck: number
+
   xp: number
   level: number
+
   /** Four gear slots: weapon/shield/boots/helmet */
   equippedItems?: EquippedItems
   dbId?: string
 }
 
 const names = [
-  'Shadow Viper',
-  'Iron Fist',
-  'Stone Hawk',
-  'Dark Wolf',
-  'Steel Fox',
-  'Night Crow',
-  'Ash Knight',
-  'Frost Blade',
-  'Ember Guard',
-  'Mud Runner',
-  'Grim Archer',
-  'Hollow Monk',
-  'Blunt Edge',
-  'Rusted Axe',
-  'Pale Rider',
-  'Neon Falcon',
-  'Azure Spectre',
-  'Titanium Ranger',
-  'Volt Striker',
-  'Jade Phantom',
-  'Crimson Wave',
-  'Silver Arrow',
-  'Thunder Monk',
-  'Plasma Fist',
-  'Sonic Blade',
-  'Storm Chaser',
-  'Venom Hawk',
-  'Crystal Guard',
-  'Magma Knight',
-  'Blaze Runner',
-  'Crimson Phantom',
-  'Obsidian Wraith',
-  'Emerald Knight',
-  'Solar Flare',
-  'Void Walker',
-  'Nova Striker',
-  'Quantum Blade',
-  'Cyber Phantom',
-  'Dark Matter',
-  'Astral Wolf',
-  'Prism Knight',
-  'Neutron Fox',
-  'Omega Guard',
-  'Apex Hunter',
-  'Nexus Monk',
-  'Golden Phoenix',
-  'Silver Sentinel',
-  'Eternal Dragon',
-  'Cosmic Emperor',
-  'Divine Titan',
-  'Celestial Wolf',
-  'Infinity Blade',
-  'Mythic Falcon',
-  'Sacred Phoenix',
-  'Arcane God',
+  "Shadow Viper",
+  "Iron Fist",
+  "Stone Hawk",
+  "Dark Wolf",
+  "Steel Fox",
+  "Night Crow",
+  "Ash Knight",
+  "Frost Blade",
+  "Ember Guard",
+  "Mud Runner",
+  "Grim Archer",
+  "Hollow Monk",
+  "Blunt Edge",
+  "Rusted Axe",
+  "Pale Rider",
+  "Neon Falcon",
+  "Azure Spectre",
+  "Titanium Ranger",
+  "Volt Striker",
+  "Jade Phantom",
+  "Crimson Wave",
+  "Silver Arrow",
+  "Thunder Monk",
+  "Plasma Fist",
+  "Sonic Blade",
+  "Storm Chaser",
+  "Venom Hawk",
+  "Crystal Guard",
+  "Magma Knight",
+  "Blaze Runner",
+  "Crimson Phantom",
+  "Obsidian Wraith",
+  "Emerald Knight",
+  "Solar Flare",
+  "Void Walker",
+  "Nova Striker",
+  "Quantum Blade",
+  "Cyber Phantom",
+  "Dark Matter",
+  "Astral Wolf",
+  "Prism Knight",
+  "Neutron Fox",
+  "Omega Guard",
+  "Apex Hunter",
+  "Nexus Monk",
+  "Golden Phoenix",
+  "Silver Sentinel",
+  "Eternal Dragon",
+  "Cosmic Emperor",
+  "Divine Titan",
+  "Celestial Wolf",
+  "Infinity Blade",
+  "Mythic Falcon",
+  "Sacred Phoenix",
+  "Arcane God",
 ]
 
-const powers = [
-  'Time Freeze',
-  'Mind Control',
-  'Super Speed',
-  'Telekinesis',
-  'Invisibility',
-  'Reality Shift',
-  'Lightning Strike',
-  'Shadow Clone',
-  'Elemental Burst',
-  'Healing Touch',
-  'Gravity Pull',
-  'Fire Storm',
-  'Ice Prison',
-  'Thunder Smash',
-  'Dark Void',
-  'Light Beam',
-  'Psychic Wave',
-  'Force Shield',
-  'Energy Drain',
-  'Dimension Slash',
-  'Plasma Cannon',
-  'Sonic Boom',
-  'Meteor Strike',
-  'Earthquake Fist',
-  'Wind Slash',
+const abilities = [
+  "Time Freeze",
+  "Mind Control",
+  "Super Speed",
+  "Telekinesis",
+  "Invisibility",
+  "Reality Shift",
+  "Lightning Strike",
+  "Shadow Clone",
+  "Elemental Burst",
+  "Healing Touch",
+  "Gravity Pull",
+  "Fire Storm",
+  "Ice Prison",
+  "Thunder Smash",
+  "Dark Void",
+  "Light Beam",
+  "Psychic Wave",
+  "Force Shield",
+  "Energy Drain",
+  "Dimension Slash",
+  "Plasma Cannon",
+  "Sonic Boom",
+  "Meteor Strike",
+  "Earthquake Fist",
+  "Wind Slash",
 ]
 
-const genders: Hero['gender'][] = ['Male', 'Female', 'Unknown']
+const genders: Hero["gender"][] = ["Male", "Female", "Unknown"]
 
-export function generateRarity(): Hero['rarity'] {
+export function generateRarity(): Hero["rarity"] {
   const roll = Math.random() * 100
-  if (roll < 60) return 'Common'
-  if (roll < 85) return 'Rare'
-  if (roll < 97) return 'Epic'
-  return 'Legendary'
+  if (roll < 60) return "Common"
+  if (roll < 85) return "Rare"
+  if (roll < 97) return "Epic"
+  return "Legendary"
 }
 
-function generateStatForRarity(rarity: Hero['rarity']): number {
-  const ranges: Record<Hero['rarity'], [number, number]> = {
-    Common: [10, 250],
-    Rare: [200, 450],
-    Epic: [400, 700],
-    Legendary: [650, 999],
+function generateStatForRarity(rarity: Hero["rarity"]): number {
+  // Keep values reasonable (used as HP pool / power / defense / luck).
+  const ranges: Record<Hero["rarity"], [number, number]> = {
+    Common: [10, 25],
+    Rare: [20, 35],
+    Epic: [30, 45],
+    Legendary: [40, 55],
   }
   const [min, max] = ranges[rarity]
   return Math.floor(Math.random() * (max - min + 1)) + min
 }
 
 export const HEROES: Hero[] = names.map((name, i) => {
-  const power = powers[i % powers.length]
+  const ability = abilities[i % abilities.length]
   const filename = name.toLowerCase().replace(/ /g, "_") + ".png"
   const imageUrl = `/heroes/${filename}`
   return {
     name,
     gender: "Unknown",
-    power,
+    ability,
     rarity: "Common",
     imageUrl,
-    attack: 10,
+    health: 10,
+    power: 10,
     defense: 10,
-    speed: 10,
+    luck: 10,
     xp: 0,
     level: 1,
   }
@@ -144,19 +155,20 @@ export const HEROES: Hero[] = names.map((name, i) => {
 export function generateHero(): Hero {
   const name = names[Math.floor(Math.random() * names.length)]
   const gender = genders[Math.floor(Math.random() * genders.length)]
-  const power = powers[Math.floor(Math.random() * powers.length)]
+  const ability = abilities[Math.floor(Math.random() * abilities.length)]
   const rarity = generateRarity()
   const filename = name.toLowerCase().replace(/ /g, "_") + ".png"
   const imageUrl = `/heroes/${filename}`
   return {
     name,
     gender,
-    power,
+    ability,
     rarity,
     imageUrl,
-    attack: generateStatForRarity(rarity),
+    health: generateStatForRarity(rarity),
+    power: generateStatForRarity(rarity),
     defense: generateStatForRarity(rarity),
-    speed: generateStatForRarity(rarity),
+    luck: generateStatForRarity(rarity),
     xp: 0,
     level: 1,
   }

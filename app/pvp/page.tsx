@@ -27,9 +27,10 @@ function heroToPvP(h: Hero & { tokenId?: string }): PvPHero {
     name: h.name,
     rarity: h.rarity,
     level: Number(h.level || 1),
-    attack: Number(h.attack || 0),
+    health: Number(h.health || 0),
+    power: Number(h.power || 0),
     defense: Number(h.defense || 0),
-    speed: Number(h.speed || 0),
+    luck: Number(h.luck || 0),
     imageUrl: h.imageUrl,
     equippedItems: h.equippedItems,
   }

@@ -36,9 +36,10 @@ export function heroFromTokenId(tokenId: bigint): Hero {
     ...base,
     rarity,
     level,
-    attack: base.attack + bump,
+    health: base.health + bump,
+    power: base.power + bump,
     defense: base.defense + bump,
-    speed: base.speed + bump,
-    power: base.power + bump * 3,
+    luck: base.luck + bump,
+    ability: base.ability,
   }
 }

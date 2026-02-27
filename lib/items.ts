@@ -8,9 +8,9 @@ export type Item = {
   name: string
   slot: ItemSlot
   rarity: ItemRarity
-  bonusATK: number
+  bonusPWR: number
   bonusDEF: number
-  bonusSPD: number
+  bonusLCK: number
   imageEmoji: string
   /** Present only for Set items */
   set?: string
@@ -18,7 +18,7 @@ export type Item = {
 
 export type EquippedItems = Partial<Record<ItemSlot, Item>>
 
-export const FULL_SET_BONUS = { atk: 200, def: 200, spd: 200 } as const
+export const FULL_SET_BONUS = { pwr: 200, def: 200, lck: 200 } as const
 
 const slotEmoji: Record<ItemSlot, string> = {
   weapon: "⚔️",
@@ -60,16 +60,16 @@ type SetName = "Dragon" | "Shadow"
 
 const setPieces: Record<SetName, Record<ItemSlot, Omit<Item, "id" | "rarity" | "slot" | "set"> & { name: string }>> = {
   Dragon: {
-    weapon: { name: "Dragonfang Blade", bonusATK: 65, bonusDEF: 10, bonusSPD: 10, imageEmoji: "🐉" },
-    shield: { name: "Dragonhide Aegis", bonusATK: 10, bonusDEF: 65, bonusSPD: 10, imageEmoji: "🐉" },
-    boots: { name: "Dragonstep Greaves", bonusATK: 10, bonusDEF: 10, bonusSPD: 65, imageEmoji: "🐉" },
-    helmet: { name: "Dragoncrest Helm", bonusATK: 25, bonusDEF: 25, bonusSPD: 25, imageEmoji: "🐉" },
+    weapon: { name: "Dragonfang Blade", bonusPWR: 65, bonusDEF: 10, bonusLCK: 10, imageEmoji: "🐉" },
+    shield: { name: "Dragonhide Aegis", bonusPWR: 10, bonusDEF: 65, bonusLCK: 10, imageEmoji: "🐉" },
+    boots: { name: "Dragonstep Greaves", bonusPWR: 10, bonusDEF: 10, bonusLCK: 65, imageEmoji: "🐉" },
+    helmet: { name: "Dragoncrest Helm", bonusPWR: 25, bonusDEF: 25, bonusLCK: 25, imageEmoji: "🐉" },
   },
   Shadow: {
-    weapon: { name: "Shadowbrand", bonusATK: 55, bonusDEF: 15, bonusSPD: 15, imageEmoji: "🕶️" },
-    shield: { name: "Shadowguard", bonusATK: 15, bonusDEF: 55, bonusSPD: 15, imageEmoji: "🕶️" },
-    boots: { name: "Shadowstride", bonusATK: 15, bonusDEF: 15, bonusSPD: 55, imageEmoji: "🕶️" },
-    helmet: { name: "Shadowveil Visor", bonusATK: 20, bonusDEF: 20, bonusSPD: 20, imageEmoji: "🕶️" },
+    weapon: { name: "Shadowbrand", bonusPWR: 55, bonusDEF: 15, bonusLCK: 15, imageEmoji: "🕶️" },
+    shield: { name: "Shadowguard", bonusPWR: 15, bonusDEF: 55, bonusLCK: 15, imageEmoji: "🕶️" },
+    boots: { name: "Shadowstride", bonusPWR: 15, bonusDEF: 15, bonusLCK: 55, imageEmoji: "🕶️" },
+    helmet: { name: "Shadowveil Visor", bonusPWR: 20, bonusDEF: 20, bonusLCK: 20, imageEmoji: "🕶️" },
   },
 }
 
@@ -92,41 +92,40 @@ function pick<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)]
 }
 
-export function generateItemBonuses(rarity: Exclude<ItemRarity, "Set">): { atk: number; def: number; spd: number } {
-  // Keep the same feel as the old weapon system.
-  let atk = 0
+export function generateItemBonuses(rarity: Exclude<ItemRarity, "Set">): { pwr: number; def: number; lck: number } {
+  let pwr = 0
   let def = 0
-  let spd = 0
+  let lck = 0
 
   if (rarity === "Common") {
-    const stats: Array<"atk" | "def" | "spd"> = ["atk", "def", "spd"]
+    const stats: Array<"pwr" | "def" | "lck"> = ["pwr", "def", "lck"]
     const chosen = pick(stats)
-    if (chosen === "atk") atk = 5
+    if (chosen === "pwr") pwr = 5
     if (chosen === "def") def = 5
-    if (chosen === "spd") spd = 5
+    if (chosen === "lck") lck = 5
   } else if (rarity === "Rare") {
-    const stats: Array<"atk" | "def" | "spd"> = ["atk", "def", "spd"]
+    const stats: Array<"pwr" | "def" | "lck"> = ["pwr", "def", "lck"]
     const first = pick(stats)
     const remaining = stats.filter((s) => s !== first)
     const second = pick(remaining)
-    if (first === "atk") atk = 10
+    if (first === "pwr") pwr = 10
     if (first === "def") def = 10
-    if (first === "spd") spd = 10
-    if (second === "atk") atk += 5
+    if (first === "lck") lck = 10
+    if (second === "pwr") pwr += 5
     if (second === "def") def += 5
-    if (second === "spd") spd += 5
+    if (second === "lck") lck += 5
   } else if (rarity === "Epic") {
-    atk = 15
+    pwr = 15
     def = 10
-    spd = 5
+    lck = 5
   } else {
     // Legendary
-    atk = 25
+    pwr = 25
     def = 25
-    spd = 25
+    lck = 25
   }
 
-  return { atk, def, spd }
+  return { pwr, def, lck }
 }
 
 export function generateItem(): Item {
@@ -143,9 +142,9 @@ export function generateItem(): Item {
       name: piece.name,
       slot,
       rarity,
-      bonusATK: piece.bonusATK,
+      bonusPWR: piece.bonusPWR,
       bonusDEF: piece.bonusDEF,
-      bonusSPD: piece.bonusSPD,
+      bonusLCK: piece.bonusLCK,
       imageEmoji: piece.imageEmoji,
       set,
     }
@@ -153,15 +152,15 @@ export function generateItem(): Item {
 
   const slot = randomSlot()
   const name = pick(itemNames[slot][rarity])
-  const { atk, def, spd } = generateItemBonuses(rarity)
+  const { pwr, def, lck } = generateItemBonuses(rarity)
   return {
     id,
     name,
     slot,
     rarity,
-    bonusATK: atk,
+    bonusPWR: pwr,
     bonusDEF: def,
-    bonusSPD: spd,
+    bonusLCK: lck,
     imageEmoji: slotEmoji[slot],
   }
 }
@@ -173,12 +172,12 @@ export function nextItemRarity(r: Exclude<ItemRarity, "Set">): Exclude<ItemRarit
   return "Legendary"
 }
 
-export function getEquippedBonuses(equipped: EquippedItems | undefined): { atk: number; def: number; spd: number } {
-  const items = equipped ? Object.values(equipped).filter(Boolean) as Item[] : []
+export function getEquippedBonuses(equipped: EquippedItems | undefined): { pwr: number; def: number; lck: number } {
+  const items = equipped ? (Object.values(equipped).filter(Boolean) as Item[]) : []
   return {
-    atk: items.reduce((s, it) => s + (it.bonusATK || 0), 0),
+    pwr: items.reduce((s, it) => s + (it.bonusPWR || 0), 0),
     def: items.reduce((s, it) => s + (it.bonusDEF || 0), 0),
-    spd: items.reduce((s, it) => s + (it.bonusSPD || 0), 0),
+    lck: items.reduce((s, it) => s + (it.bonusLCK || 0), 0),
   }
 }
 
@@ -193,8 +192,8 @@ export function getFullSetName(equipped: EquippedItems | undefined): string | nu
   return null
 }
 
-export function getSetBonus(equipped: EquippedItems | undefined): { atk: number; def: number; spd: number; setName: string | null } {
+export function getSetBonus(equipped: EquippedItems | undefined): { pwr: number; def: number; lck: number; setName: string | null } {
   const setName = getFullSetName(equipped)
-  if (!setName) return { atk: 0, def: 0, spd: 0, setName: null }
-  return { atk: FULL_SET_BONUS.atk, def: FULL_SET_BONUS.def, spd: FULL_SET_BONUS.spd, setName }
+  if (!setName) return { pwr: 0, def: 0, lck: 0, setName: null }
+  return { pwr: FULL_SET_BONUS.pwr, def: FULL_SET_BONUS.def, lck: FULL_SET_BONUS.lck, setName }
 }

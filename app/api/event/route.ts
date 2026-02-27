@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
     const cooldownKey = `shareCooldown:${fid}`
     const last = (globalThis as any)[cooldownKey] as number | undefined
     if (last && now - last < 6 * 60 * 60 * 1000) {
-      return NextResponse.json({ ok: true, cooldown: true, score: store.scores.get(key) ?? 0 })
+      return NextResponse.json({ ok: true, cooldown: true })
     }
 
     try {

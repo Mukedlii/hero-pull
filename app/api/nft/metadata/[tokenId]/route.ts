@@ -21,10 +21,11 @@ export async function GET(_req: NextRequest, ctx: { params: { tokenId: string } 
     attributes: [
       { trait_type: 'Rarity', value: hero.rarity },
       { trait_type: 'Level', value: hero.level },
-      { trait_type: 'Attack', value: hero.attack },
-      { trait_type: 'Defense', value: hero.defense },
-      { trait_type: 'Speed', value: hero.speed },
+      { trait_type: 'Health', value: hero.health },
       { trait_type: 'Power', value: hero.power },
+      { trait_type: 'Defense', value: hero.defense },
+      { trait_type: 'Luck', value: hero.luck },
+      { trait_type: 'Ability', value: hero.ability },
     ],
   })
 }

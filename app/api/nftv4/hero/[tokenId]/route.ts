@@ -20,13 +20,13 @@ export async function GET(_req: NextRequest, ctx: { params: { tokenId: string } 
     const client = createPublicClient({ chain: base, transport: http(rpcUrl) })
 
     const [seed, tierRaw] = await Promise.all([
-      client.readContract({
+      (client as any).readContract({
         address: HERO_PULL_V4_CONTRACT_ADDRESS,
         abi: HERO_PULL_V4_ABI,
         functionName: "seedOf",
         args: [id],
       }) as Promise<bigint>,
-      client.readContract({
+      (client as any).readContract({
         address: HERO_PULL_V4_CONTRACT_ADDRESS,
         abi: HERO_PULL_V4_ABI,
         functionName: "tierOf",

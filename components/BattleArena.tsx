@@ -28,13 +28,14 @@ export default function BattleArena({ hero, opponent, winner, battleId, onBattle
     const setBonus = getSetBonus(hero.equippedItems)
 
     return {
-      base: { atk: hero.attack, def: hero.defense, spd: hero.speed },
+      base: { hp: hero.health, pwr: hero.power, def: hero.defense, lck: hero.luck },
       itemBonus,
       setBonus,
       total: {
-        atk: hero.attack + itemBonus.atk + setBonus.atk,
+        hp: hero.health,
+        pwr: hero.power + itemBonus.pwr + setBonus.pwr,
         def: hero.defense + itemBonus.def + setBonus.def,
-        spd: hero.speed + itemBonus.spd + setBonus.spd,
+        lck: hero.luck + itemBonus.lck + setBonus.lck,
       },
     }
   }, [hero])
@@ -44,20 +45,21 @@ export default function BattleArena({ hero, opponent, winner, battleId, onBattle
     const setBonus = getSetBonus(opponent.equippedItems)
 
     return {
-      base: { atk: opponent.attack, def: opponent.defense, spd: opponent.speed },
+      base: { hp: opponent.health, pwr: opponent.power, def: opponent.defense, lck: opponent.luck },
       itemBonus,
       setBonus,
       total: {
-        atk: opponent.attack + itemBonus.atk + setBonus.atk,
+        hp: opponent.health,
+        pwr: opponent.power + itemBonus.pwr + setBonus.pwr,
         def: opponent.defense + itemBonus.def + setBonus.def,
-        spd: opponent.speed + itemBonus.spd + setBonus.spd,
+        lck: opponent.luck + itemBonus.lck + setBonus.lck,
       },
     }
   }, [opponent])
 
   const plannedWinner: Side = useMemo(() => {
-    const heroScore = heroEff.total.atk + heroEff.total.def + heroEff.total.spd
-    const oppScore = oppEff.total.atk + oppEff.total.def + oppEff.total.spd
+    const heroScore = heroEff.total.pwr + heroEff.total.def + heroEff.total.lck
+    const oppScore = oppEff.total.pwr + oppEff.total.def + oppEff.total.lck
     return heroScore >= oppScore ? 'hero' : 'opponent'
   }, [heroEff, oppEff])
 
@@ -96,8 +98,8 @@ export default function BattleArena({ hero, opponent, winner, battleId, onBattle
     const heroBias = plannedWinner === 'hero' ? 1 : -1
     const oppBias = plannedWinner === 'opponent' ? 1 : -1
 
-    const heroBase = Math.max(6, Math.floor(heroEff.total.atk * 0.65 - oppEff.total.def * 0.25 + heroEff.total.spd * 0.1))
-    const oppBase = Math.max(6, Math.floor(oppEff.total.atk * 0.65 - heroEff.total.def * 0.25 + oppEff.total.spd * 0.1))
+    const heroBase = Math.max(6, Math.floor(heroEff.total.pwr * 0.65 - oppEff.total.def * 0.25 + heroEff.total.lck * 0.05))
+    const oppBase = Math.max(6, Math.floor(oppEff.total.pwr * 0.65 - heroEff.total.def * 0.25 + oppEff.total.lck * 0.05))
 
     const heroDmg = [
       Math.max(4, heroBase + 4 * heroBias),
@@ -193,11 +195,11 @@ export default function BattleArena({ hero, opponent, winner, battleId, onBattle
           </div>
           <div className="flex-1">
             <div className="text-[11px] text-gray-300">
-              ATK {eff.base.atk}{" "}
-              {(eff.itemBonus.atk > 0 || eff.setBonus.atk > 0) && (
+              PWR {eff.base.pwr}{" "}
+              {(eff.itemBonus.pwr > 0 || eff.setBonus.pwr > 0) && (
                 <>
-                  <span className="text-green-400">[+{eff.itemBonus.atk}]</span>
-                  {eff.setBonus.atk > 0 && <span className="text-[#f97316]">[+{eff.setBonus.atk}]</span>}
+                  <span className="text-green-400">[+{eff.itemBonus.pwr}]</span>
+                  {eff.setBonus.pwr > 0 && <span className="text-[#f97316]">[+{eff.setBonus.pwr}]</span>}
                 </>
               )}
             </div>
@@ -211,14 +213,15 @@ export default function BattleArena({ hero, opponent, winner, battleId, onBattle
               )}
             </div>
             <div className="text-[11px] text-gray-300">
-              SPD {eff.base.spd}{" "}
-              {(eff.itemBonus.spd > 0 || eff.setBonus.spd > 0) && (
+              LCK {eff.base.lck}{" "}
+              {(eff.itemBonus.lck > 0 || eff.setBonus.lck > 0) && (
                 <>
-                  <span className="text-green-400">[+{eff.itemBonus.spd}]</span>
-                  {eff.setBonus.spd > 0 && <span className="text-[#f97316]">[+{eff.setBonus.spd}]</span>}
+                  <span className="text-green-400">[+{eff.itemBonus.lck}]</span>
+                  {eff.setBonus.lck > 0 && <span className="text-[#f97316]">[+{eff.setBonus.lck}]</span>}
                 </>
               )}
             </div>
+            <div className="text-[10px] text-gray-400">🍀 Crit: {Math.round(Math.min(0.6, 0.10 + (eff.total.lck / 10) * 0.01) * 100)}%</div>
           </div>
         </div>
 

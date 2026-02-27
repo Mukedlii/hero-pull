@@ -34,12 +34,12 @@ export default function BattlePage() {
     setTimeout(() => {
       const itemBonus = getEquippedBonuses(hero.equippedItems)
       const setBonus = getSetBonus(hero.equippedItems)
-      const heroEffectiveATK = hero.attack + itemBonus.atk + setBonus.atk
+      const heroEffectivePWR = hero.power + itemBonus.pwr + setBonus.pwr
       const heroEffectiveDEF = hero.defense + itemBonus.def + setBonus.def
-      const heroEffectiveSPD = hero.speed + itemBonus.spd + setBonus.spd
-      const heroScore = heroEffectiveATK + heroEffectiveDEF + heroEffectiveSPD
+      const heroEffectiveLCK = hero.luck + itemBonus.lck + setBonus.lck
+      const heroScore = heroEffectivePWR + heroEffectiveDEF + heroEffectiveLCK
 
-      const oppScore = o.attack + o.defense + o.speed
+      const oppScore = o.power + o.defense + o.luck
       const w = heroScore >= oppScore ? "hero" : "opponent"
       setWinner(w)
 

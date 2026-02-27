@@ -25,9 +25,10 @@ export function heroFromSeedAndTier(seedBig: bigint, tokenId: bigint, tier: Tier
     ...base,
     rarity,
     level,
-    attack: baseStat,
+    health: baseStat,
+    power: baseStat,
     defense: baseStat,
-    speed: baseStat,
-    power: base.power,
+    luck: baseStat,
+    ability: base.ability,
   }
 }

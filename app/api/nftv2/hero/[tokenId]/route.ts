@@ -19,7 +19,7 @@ export async function GET(_req: NextRequest, ctx: { params: { tokenId: string } 
     const rpcUrl = "https://base-rpc.publicnode.com"
     const client = createPublicClient({ chain: base, transport: http(rpcUrl) })
 
-    const seed = (await client.readContract({
+    const seed = (await (client as any).readContract({
       address: HERO_PULL_V2_CONTRACT_ADDRESS,
       abi: HERO_PULL_V2_ABI,
       functionName: "seedOf",

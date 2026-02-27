@@ -88,9 +88,9 @@ function pickDragonSetPiece(): Item {
     name: slot === "weapon" ? "Dragon Blade" : slot === "shield" ? "Dragon Shield" : slot === "boots" ? "Dragon Boots" : "Dragon Helm",
     slot,
     rarity: "Set",
-    bonusATK: slot === "weapon" ? 120 : slot === "shield" ? 20 : slot === "boots" ? 20 : 60,
+    bonusPWR: slot === "weapon" ? 120 : slot === "shield" ? 20 : slot === "boots" ? 20 : 60,
     bonusDEF: slot === "weapon" ? 20 : slot === "shield" ? 120 : slot === "boots" ? 20 : 60,
-    bonusSPD: slot === "weapon" ? 20 : slot === "shield" ? 20 : slot === "boots" ? 120 : 60,
+    bonusLCK: slot === "weapon" ? 20 : slot === "shield" ? 20 : slot === "boots" ? 120 : 60,
     imageEmoji: "🐉",
     set: "Dragon",
   }
@@ -144,7 +144,7 @@ export default function ShopPage() {
 
       const inv = await loadInventory()
       setInventoryCount(inv.items.length)
-      setMsg(`Bought ${item.name} (+${item.bonusATK} ATK, +${item.bonusDEF} DEF, +${item.bonusSPD} SPD)`) 
+      setMsg(`Bought ${item.name} (+${item.bonusPWR} PWR, +${item.bonusDEF} DEF, +${item.bonusLCK} LCK)`) 
     } catch (e: any) {
       setErr(e?.message || String(e))
     } finally {
@@ -263,7 +263,7 @@ export default function ShopPage() {
                 <div className="text-3xl">{t.imageEmoji}</div>
                 <div className="font-bold text-sm mt-1 leading-tight">{t.name}</div>
                 <div className="text-xs text-gray-400">{t.rarity} • {t.slot.toUpperCase()}</div>
-                <div className="text-xs mt-2">+{t.bonusATK} ATK • +{t.bonusDEF} DEF • +{t.bonusSPD} SPD</div>
+                <div className="text-xs mt-2">+{t.bonusPWR} PWR • +{t.bonusDEF} DEF • +{t.bonusLCK} LCK</div>
 
                 <button
                   disabled={busy || gold < t.priceGold}

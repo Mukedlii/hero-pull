@@ -189,13 +189,14 @@ export function HeroesMasterDetail() {
     const itemBonus = getEquippedBonuses(selected.equippedItems)
     const setBonus = getSetBonus(selected.equippedItems)
     return {
-      base: { atk: selected.attack, def: selected.defense, spd: selected.speed },
+      base: { hp: selected.health, pwr: selected.power, def: selected.defense, lck: selected.luck },
       itemBonus,
       setBonus,
       total: {
-        atk: selected.attack + itemBonus.atk + setBonus.atk,
+        hp: selected.health,
+        pwr: selected.power + itemBonus.pwr + setBonus.pwr,
         def: selected.defense + itemBonus.def + setBonus.def,
-        spd: selected.speed + itemBonus.spd + setBonus.spd,
+        lck: selected.luck + itemBonus.lck + setBonus.lck,
       },
     }
   }, [selected])
@@ -368,11 +369,13 @@ export function HeroesMasterDetail() {
 
         {tab === "stats" && selectedEff && (
           <div className="mt-4 space-y-1">
-            {statLine("ATK", selectedEff.base.atk, selectedEff.itemBonus.atk, selectedEff.setBonus.atk)}
+            {statLine("HP", selectedEff.base.hp, 0, 0)}
+            {statLine("PWR", selectedEff.base.pwr, selectedEff.itemBonus.pwr, selectedEff.setBonus.pwr)}
             {statLine("DEF", selectedEff.base.def, selectedEff.itemBonus.def, selectedEff.setBonus.def)}
-            {statLine("SPD", selectedEff.base.spd, selectedEff.itemBonus.spd, selectedEff.setBonus.spd)}
+            {statLine("LCK", selectedEff.base.lck, selectedEff.itemBonus.lck, selectedEff.setBonus.lck)}
 
-            <div className="mt-3 text-xs text-gray-500">Total: {selectedEff.total.atk + selectedEff.total.def + selectedEff.total.spd}</div>
+            <div className="mt-2 text-[11px] text-gray-400">🍀 Crit: {Math.round(Math.min(0.6, 0.10 + (selectedEff.total.lck / 10) * 0.01) * 100)}%</div>
+            <div className="mt-3 text-xs text-gray-500">Total: {selectedEff.total.pwr + selectedEff.total.def + selectedEff.total.lck}</div>
 
             <div className="mt-4 flex gap-2">
               <button
@@ -436,7 +439,7 @@ export function HeroesMasterDetail() {
                     <div className="text-2xl">{it.imageEmoji}</div>
                     <div className="text-xs font-bold mt-1 leading-tight">{it.name}</div>
                     <div className="text-[10px] text-gray-400">{it.rarity} • {it.slot.toUpperCase()}</div>
-                    <div className="text-[10px] text-gray-300 mt-1">+{it.bonusATK} ATK • +{it.bonusDEF} DEF • +{it.bonusSPD} SPD</div>
+                    <div className="text-[10px] text-gray-300 mt-1">+{it.bonusPWR} PWR • +{it.bonusDEF} DEF • +{it.bonusLCK} LCK</div>
                     {it.set ? <div className="text-[10px] text-[#f97316] mt-1">Set: {it.set}</div> : null}
                   </button>
                 ))}
@@ -469,7 +472,7 @@ export function HeroesMasterDetail() {
                   <div className="mt-2 text-xs">
                     <div className="font-bold">{selected.equippedItems?.[equipPending.slot]?.name}</div>
                     <div className="text-gray-300">
-                      +{selected.equippedItems?.[equipPending.slot]?.bonusATK} ATK • +{selected.equippedItems?.[equipPending.slot]?.bonusDEF} DEF • +{selected.equippedItems?.[equipPending.slot]?.bonusSPD} SPD
+                      +{selected.equippedItems?.[equipPending.slot]?.bonusPWR} PWR • +{selected.equippedItems?.[equipPending.slot]?.bonusDEF} DEF • +{selected.equippedItems?.[equipPending.slot]?.bonusLCK} LCK
                     </div>
                   </div>
                 ) : (
@@ -482,7 +485,7 @@ export function HeroesMasterDetail() {
                 <div className="mt-2 text-xs">
                   <div className="font-bold">{equipPending.item.imageEmoji} {equipPending.item.name}</div>
                   <div className="text-gray-300">
-                    +{equipPending.item.bonusATK} ATK • +{equipPending.item.bonusDEF} DEF • +{equipPending.item.bonusSPD} SPD
+                    +{equipPending.item.bonusPWR} PWR • +{equipPending.item.bonusDEF} DEF • +{equipPending.item.bonusLCK} LCK
                   </div>
                   {equipPending.item.set ? <div className="text-[#f97316] mt-1">Set: {equipPending.item.set}</div> : null}
                 </div>

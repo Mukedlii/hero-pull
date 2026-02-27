@@ -30,7 +30,7 @@ type Enemy = {
   maxHp: number
   atk: number
   def: number
-  spd: number
+  lck: number
   score: number
   gold: number
   boss: boolean
@@ -68,10 +68,10 @@ function pickWeighted<T extends string>(rows: Array<{ type: T; w: number }>): T 
   return rows[0]!.type
 }
 
-function hpFromHeroStats(atk: number, def: number) {
-  // hero stats are 10..999 and items add +200 set; scale for 100 floors without going infinite.
-  const v = 160 + Math.floor(def * 0.62) + Math.floor(atk * 0.22)
-  return clampInt(v, 140, 1400)
+function hpFromHeroStats(health: number, def: number) {
+  // Health is the main HP pool. Keep battles reasonably paced.
+  const v = 60 + Math.floor(health * 3.2) + Math.floor(def * 1.1)
+  return clampInt(v, 70, 2200)
 }
 
 function loadPotionCounts(): PotionCounts {
@@ -303,9 +303,9 @@ function enemyFromLevel(level: number, floor: number, boss: boolean): Enemy {
   const hp = clampInt(randInt(base.hp[0], base.hp[1]) * (boss ? 1.0 : fScale), 1, 999999)
   const atk = clampInt(randInt(base.atk[0], base.atk[1]) * (boss ? 1.0 : fScale), 1, 999999)
   const def = clampInt(randInt(base.def[0], base.def[1]) * (boss ? 1.0 : fScale), 1, 999999)
-  const spd = clampInt(randInt(base.spd[0], base.spd[1]) * (boss ? 1.0 : 1 + (floor - 1) * 0.03), 1, 999999)
+  const lck = clampInt(randInt(base.lck[0], base.lck[1]) * (boss ? 1.0 : 1 + (floor - 1) * 0.03), 1, 999999)
 
-  const score = clampInt(22 + level * 10 + floor * 3 + Math.floor((atk + def + spd) / 180), 1, 999999)
+  const score = clampInt(22 + level * 10 + floor * 3 + Math.floor((atk + def + lck) / 180), 1, 999999)
   const gold = clampInt(randInt(cfg.battleGold[0], cfg.battleGold[1]) + Math.floor(level * 2 + floor * 0.5), 0, 999999)
 
   return {
@@ -315,7 +315,7 @@ function enemyFromLevel(level: number, floor: number, boss: boolean): Enemy {
     maxHp: hp,
     atk,
     def,
-    spd,
+    lck,
     score,
     gold,
     boss,
@@ -333,13 +333,14 @@ export default function DungeonPage() {
     const itemBonus = getEquippedBonuses(equipped)
     const setBonus = getSetBonus(equipped)
     return {
-      base: { atk: hero.attack, def: hero.defense, spd: hero.speed },
+      base: { hp: hero.health, pwr: hero.power, def: hero.defense, lck: hero.luck },
       itemBonus,
       setBonus,
       total: {
-        atk: hero.attack + itemBonus.atk + setBonus.atk,
+        hp: hero.health,
+        pwr: hero.power + itemBonus.pwr + setBonus.pwr,
         def: hero.defense + itemBonus.def + setBonus.def,
-        spd: hero.speed + itemBonus.spd + setBonus.spd,
+        lck: hero.luck + itemBonus.lck + setBonus.lck,
       },
     }
   }, [hero, equipped])
@@ -441,7 +442,7 @@ export default function DungeonPage() {
     setFloor(F)
     setRoom(F === 10 ? "boss" : pickWeighted(roomWeightsForFloor(F)))
 
-    const mhp = hpFromHeroStats(eff.total.atk, eff.total.def)
+    const mhp = hpFromHeroStats(eff.total.hp, eff.total.def)
     setPlayerMaxHp(mhp)
     setPlayerHp(mhp)
 
@@ -554,7 +555,7 @@ export default function DungeonPage() {
     setDefending(false)
     setLoot(null)
 
-    const heroFirst = eff.total.spd >= e.spd
+    const heroFirst = true
     setPlayerTurn(heroFirst)
 
     appendLog(`${boss ? "🐉" : "⚔️"} ${e.name} appears! ${heroFirst ? "Your move." : "It strikes first!"}`)
@@ -568,7 +569,7 @@ export default function DungeonPage() {
     if (!eff) return
 
     const heroDef = eff.total.def
-    const critChance = 0.08 + Math.min(0.07, Math.max(0, (e.spd - eff.total.spd) / 1200))
+    const critChance = 0.08
     const { dmg, crit } = calcDamage(e.atk, heroDef * (defending ? 1.6 : 1), critChance, 1.7)
 
     setDefending(false)
@@ -597,7 +598,10 @@ export default function DungeonPage() {
     setDefending(false)
 
     const pts = clampInt(e.score * (e.boss ? 4 : 1) + level * 12 + floor * 5, 0, 999999)
-    const gold = clampInt(e.gold + Math.floor(Math.random() * 12) + floor, 0, 999999)
+
+    const goldBase = e.gold + Math.floor(Math.random() * 12) + floor
+    const goldMultiplier = 1 + (eff.total.lck / 50) * 0.05
+    const gold = clampInt(Math.floor(goldBase * goldMultiplier), 0, 999999)
 
     setRunScore((s) => s + pts)
     setRunGold((g) => g + gold)
@@ -624,7 +628,23 @@ export default function DungeonPage() {
 
     // Drops
     if (!e.boss && Math.random() < levelCfg.itemDropRate) {
-      const it = generateDropForDepth(depth)
+      const luckBonusLegendary = (eff.total.lck / 20) * 0.001
+      const luckBonusSet = (eff.total.lck / 20) * 0.0005
+
+      let it = generateDropForDepth(depth)
+      let lucky = false
+
+      if (Math.random() < luckBonusSet) {
+        // force set
+        it = generateSetTarget(desiredSetForDepth(depth))
+        lucky = true
+      } else if (Math.random() < luckBonusLegendary) {
+        // upgrade to legendary
+        it = generateRarityTarget("Legendary")
+        lucky = true
+      }
+
+      if (lucky) appendLog("🍀 LUCKY DROP!")
       setLoot(it)
       triggerLootFx(it)
       appendLog(`🎁 Loot dropped: ${it.name} (${it.rarity}${it.set ? ` / ${it.set}` : ""}).`)
@@ -667,13 +687,13 @@ export default function DungeonPage() {
 
     setPlayerTurn(false)
 
-    const heroAtk = eff.total.atk
-    const critChance = 0.1 + Math.min(0.08, Math.max(0, (eff.total.spd - enemy.spd) / 1500))
-    const { dmg, crit } = calcDamage(heroAtk, enemy.def, critChance, 1.9)
+    const heroPwr = eff.total.pwr
+    const critChance = Math.min(0.6, 0.10 + (eff.total.lck / 10) * 0.01)
+    const { dmg, crit } = calcDamage(heroPwr, enemy.def, critChance, 1.9)
 
     const nextEnemyHp = Math.max(0, enemy.hp - dmg)
     setEnemy({ ...enemy, hp: nextEnemyHp })
-    appendLog(`⚔️ You attack for ${dmg}${crit ? " (CRIT)" : ""}.`)
+    appendLog(crit ? `💥 CRITICAL! x1.9 — You hit for ${dmg}.` : `⚔️ You attack for ${dmg}.`)
 
     if (nextEnemyHp <= 0) {
       endBattleWin({ ...enemy, hp: nextEnemyHp }).catch(() => {})
@@ -703,13 +723,13 @@ export default function DungeonPage() {
     setPlayerTurn(false)
     setMp((m) => Math.max(0, m - cost))
 
-    const heroAtk = eff.total.atk
-    const base = Math.floor(heroAtk * 0.18 + eff.total.spd * 0.03)
+    const heroPwr = eff.total.pwr
+    const base = Math.floor(heroPwr * 0.18 + eff.total.lck * 0.03)
     const dmg = Math.max(1, base - Math.floor(enemy.def * 0.06))
 
     const nextEnemyHp = Math.max(0, enemy.hp - dmg)
     setEnemy({ ...enemy, hp: nextEnemyHp })
-    appendLog(`✨ ${hero?.power || "Skill"}! You deal ${dmg}.`)
+    appendLog(`✨ ${hero?.ability || "Skill"}! You deal ${dmg}.`)
 
     if (nextEnemyHp <= 0) {
       endBattleWin({ ...enemy, hp: nextEnemyHp }).catch(() => {})
@@ -1043,10 +1063,10 @@ export default function DungeonPage() {
           <img src={hero.imageUrl} alt={hero.name} className="w-16 h-16 rounded-2xl object-cover border border-gray-700" />
           <div className="min-w-0 flex-1">
             <div className="font-extrabold truncate">{hero.name}</div>
-            <div className="text-xs text-gray-400 truncate">{hero.rarity} • {hero.power}</div>
+            <div className="text-xs text-gray-400 truncate">{hero.rarity} • {hero.ability}</div>
             {showSetBonus ? (
               <div className="mt-1 inline-flex items-center gap-1 text-[10px] font-extrabold text-[#f97316] border border-[#f97316]/60 bg-[#f97316]/10 px-2 py-0.5 rounded-full">
-                🔥 FULL SET BONUS • {eff.setBonus.setName} (+{FULL_SET_BONUS.atk}/{FULL_SET_BONUS.def}/{FULL_SET_BONUS.spd})
+                🔥 FULL SET BONUS • {eff.setBonus.setName} (+{FULL_SET_BONUS.pwr}/{FULL_SET_BONUS.def}/{FULL_SET_BONUS.lck})
               </div>
             ) : null}
           </div>
@@ -1062,8 +1082,9 @@ export default function DungeonPage() {
             <div className="font-bold text-gray-100">{mp}/50</div>
           </div>
           <div className="border border-gray-800 rounded-xl p-2 bg-gray-950/30">
-            <div className="text-gray-400">ATK / DEF / SPD</div>
-            <div className="font-bold text-gray-100">{eff.total.atk} / {eff.total.def} / {eff.total.spd}</div>
+            <div className="text-gray-400">PWR / DEF / LCK</div>
+            <div className="font-bold text-gray-100">{eff.total.pwr} / {eff.total.def} / {eff.total.lck}</div>
+            <div className="text-[11px] text-gray-400">🍀 Crit: {Math.round(Math.min(0.6, 0.10 + (eff.total.lck / 10) * 0.01) * 100)}%</div>
           </div>
           <div className="border border-gray-800 rounded-xl p-2 bg-gray-950/30">
             <div className="text-gray-400">Potions (cap 5)</div>
@@ -1204,7 +1225,7 @@ export default function DungeonPage() {
                   <div className="text-3xl">{enemy.emoji}</div>
                   <div>
                     <div className="font-bold text-sm text-red-200">{enemy.name}</div>
-                    <div className="text-[11px] text-gray-400">ATK {enemy.atk} • DEF {enemy.def} • SPD {enemy.spd}</div>
+                    <div className="text-[11px] text-gray-400">ATK {enemy.atk} • DEF {enemy.def}</div>
                   </div>
                 </div>
                 <div className="text-right">
@@ -1253,7 +1274,7 @@ export default function DungeonPage() {
                       <div>
                         <div className="font-extrabold text-sm">{it.imageEmoji} {it.name}</div>
                         <div className="text-[11px] text-gray-400">{it.rarity} • {slotLabel(it.slot)}{it.set ? ` • Set ${it.set}` : ""}</div>
-                        <div className="text-[11px] text-gray-300 mt-1">+{it.bonusATK} ATK • +{it.bonusDEF} DEF • +{it.bonusSPD} SPD</div>
+                        <div className="text-[11px] text-gray-300 mt-1">+{it.bonusPWR} PWR • +{it.bonusDEF} DEF • +{it.bonusLCK} LCK</div>
                       </div>
                       <button disabled={busy} onClick={() => buyShopItem(it).catch(() => {})} className="bg-yellow-600 hover:bg-yellow-500 disabled:opacity-50 text-white font-extrabold py-2 px-3 rounded-xl text-xs">Buy</button>
                     </div>
@@ -1308,7 +1329,7 @@ export default function DungeonPage() {
 
               <div className="mt-2 text-xs text-gray-200 font-bold">{loot.imageEmoji} {loot.name}</div>
               <div className="text-[11px] text-gray-400">{loot.rarity} • {slotLabel(loot.slot)}{loot.set ? ` • Set ${loot.set}` : ""}</div>
-              <div className="text-[11px] text-gray-300 mt-1">ATK+{loot.bonusATK} DEF+{loot.bonusDEF} SPD+{loot.bonusSPD}</div>
+              <div className="text-[11px] text-gray-300 mt-1">PWR+{loot.bonusPWR} DEF+{loot.bonusDEF} LCK+{loot.bonusLCK}</div>
 
               <div className="mt-3 grid grid-cols-2 gap-2">
                 <button onClick={() => { equipItem(loot); setLoot(null) }} className="bg-green-700 hover:bg-green-600 text-white font-extrabold py-2 rounded-xl text-xs">EQUIP</button>

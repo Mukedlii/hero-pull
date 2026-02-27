@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
   const ids = KNOWN_TOKEN_IDS.map((x) => BigInt(x))
   const accounts = ids.map(() => address as `0x${string}`)
 
-  const balances = (await client.readContract({
+  const balances = (await (client as any).readContract({
     address: WEAPON_CONTRACT_ADDRESS,
     abi: WEAPON_ABI,
     functionName: "balanceOfBatch",
