@@ -24,3 +24,5 @@ hardhat/cache/
 
 # typescript
 *.tsbuildinfo
+
+.vercel
