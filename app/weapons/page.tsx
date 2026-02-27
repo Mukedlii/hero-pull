@@ -163,6 +163,64 @@ export default function WeaponsPage() {
     return r === "Legendary" ? false : counts[r] >= 3
   }
 
+  const mergeOnchain = async (rarity: WeaponRarity) => {
+    if (!WEAPON_CONTRACT_ADDRESS) return
+    const mod: any = await import("@farcaster/frame-sdk")
+    const provider = mod?.default?.wallet?.ethProvider ?? mod?.sdk?.wallet?.ethProvider ?? (window as any).ethereum
+    if (!provider) throw new Error("No wallet provider")
+
+    try {
+      await provider.request({ method: "eth_requestAccounts" })
+    } catch {}
+
+    const accounts = await provider.request({ method: "eth_accounts" })
+    const from = accounts?.[0]
+    if (!from) throw new Error("Wallet not connected")
+
+    // Pick a tokenId to merge for this rarity (any type)
+    const ids = weapons
+      .filter((w) => w.rarity === rarity)
+      .map((w) => Number(String(w.id).replace(/^onchain-/, "").split("-")[0]))
+      .filter((x) => Number.isFinite(x))
+
+    const countsById = new Map<number, number>()
+    for (const id of ids) countsById.set(id, (countsById.get(id) || 0) + 1)
+    const tokenIdNum = Array.from(countsById.entries()).find(([, c]) => c >= 3)?.[0]
+    if (!tokenIdNum) throw new Error("Need 3 of same weapon to merge")
+
+    const data = encodeFunctionData({
+      abi: WEAPON_ABI,
+      functionName: "merge",
+      args: [BigInt(tokenIdNum)],
+    })
+
+    await provider.request({
+      method: "eth_sendTransaction",
+      params: [
+        {
+          chainId: BASE_CHAIN_ID_HEX,
+          from,
+          to: WEAPON_CONTRACT_ADDRESS,
+          data,
+        },
+      ],
+    })
+
+    // refresh inventory
+    const res = await fetch(`/api/weapons/onchain?address=${from}`, { cache: "no-store" })
+    const json = await res.json()
+    const items = Array.isArray(json?.items) ? json.items : []
+    const list: Weapon[] = []
+    for (const it of items) {
+      const qty = Number(it?.balance || 0)
+      const w = it?.weapon as Weapon
+      if (w && qty > 0) {
+        for (let i = 0; i < qty; i++) list.push({ ...w, id: `${w.id}-${i}` })
+      }
+    }
+    setWeapons(list)
+  }
+
   const mergeRarity = async (r: WeaponRarity) => {
     if (!canMergeRarity(r)) return
     setLoading(true)
@@ -347,11 +405,14 @@ export default function WeaponsPage() {
             <p className="text-xs text-gray-400 mt-1">Count: {counts[r]}</p>
             {r !== "Legendary" && (
               <button
-                onClick={() => mergeRarity(r)}
-                disabled={wallet ? true : !canMergeRarity(r)}
+                onClick={() => {
+                  if (wallet) mergeOnchain(r).catch((e) => alert(e?.message || String(e)))
+                  else mergeRarity(r)
+                }}
+                disabled={!canMergeRarity(r)}
                 className="mt-2 w-full bg-yellow-600 hover:bg-yellow-500 disabled:opacity-40 text-white text-xs py-2 rounded-xl"
               >
-                {wallet ? "Onchain merge soon" : `Merge 3 → ${nextWeaponRarity(r)}`}
+                Merge 3 → {nextWeaponRarity(r)}
               </button>
             )}
           </div>

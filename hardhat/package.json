@@ -6,7 +6,8 @@
     "compile": "hardhat compile",
     "deploy:base": "hardhat run --network base scripts/deploy.js",
     "deploy:weapon:base": "hardhat run --network base scripts/deploy-weapon.js",
-    "deploy:herov2:base": "hardhat run --network base scripts/deploy-herov2.js"
+    "deploy:herov2:base": "hardhat run --network base scripts/deploy-herov2.js",
+    "deploy:weaponv2:base": "hardhat run --network base scripts/deploy-weaponv2.js"
   },
   "dependencies": {
     "@openzeppelin/contracts": "^5.0.2"
