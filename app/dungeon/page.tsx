@@ -1099,6 +1099,23 @@ export default function DungeonPage() {
             <div className="text-gray-400">Potions (cap 5)</div>
             <div className="font-bold text-gray-100">🧪 {pots.healing} • 🔷 {pots.mana} • ✨ {pots.elixir}</div>
           </div>
+
+          <div className="border border-gray-800 rounded-xl p-2 bg-gray-950/30 col-span-2">
+            <div className="text-gray-400">Equipped</div>
+            <div className="mt-1 grid grid-cols-2 gap-2">
+              {(["weapon", "shield", "boots", "helmet"] as const).map((slot) => {
+                const it = equipped?.[slot]
+                return (
+                  <div key={slot} className="flex items-center justify-between border border-gray-800 bg-gray-900/30 rounded-xl px-2 py-1">
+                    <div className="text-[11px] text-gray-300">
+                      <span className="text-gray-500">{slotLabel(slot)}:</span> {it ? `${it.imageEmoji} ${it.name}` : "—"}
+                    </div>
+                    {it ? <div className="text-[10px] text-gray-400">PWR+{it.bonusPWR} DEF+{it.bonusDEF} LCK+{it.bonusLCK}</div> : null}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
         </div>
       </div>
 
