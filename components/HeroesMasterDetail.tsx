@@ -5,9 +5,16 @@ import type { Hero } from "@/lib/heroes"
 import type { Item, ItemRarity, ItemSlot } from "@/lib/items"
 import { getEquippedBonuses, getSetBonus } from "@/lib/items"
 import { loadInventory } from "@/lib/inventory"
-import { getWalletAddress, loadHeroes, updateHeroEquippedItems } from "@/lib/db"
+import { getWalletAddress } from "@/lib/db"
+import { HERO_PULL_V2_CONTRACT_ADDRESS } from "@/lib/heroPullV2Contract"
+import { HERO_PULL_V3_CONTRACT_ADDRESS } from "@/lib/heroPullV3Contract"
+import { HERO_PULL_V4_CONTRACT_ADDRESS } from "@/lib/heroPullV4Contract"
 
 type Tab = "stats" | "weapons"
+
+type HeroWithToken = Hero & { tokenId?: string }
+
+const EQUIP_MAP_KEY = "hero-pull-equipped-items" // { [tokenId]: EquippedItems }
 
 const COLLECTION_KEY = "hero-pull-collection"
 const CURRENT_HERO_KEY = "hero-pull-current-hero"
@@ -67,19 +74,72 @@ function saveLocalHeroes(list: Hero[]) {
   }
 }
 
-function sameHero(a: Hero | null, b: Hero | null): boolean {
+function sameHero(a: HeroWithToken | null, b: HeroWithToken | null): boolean {
   if (!a || !b) return false
+  if (a.tokenId && b.tokenId) return String(a.tokenId) === String(b.tokenId)
   if (a.dbId && b.dbId) return a.dbId === b.dbId
   return a.name === b.name && a.imageUrl === b.imageUrl && a.rarity === b.rarity
 }
 
+function loadEquipMap(): Record<string, any> {
+  if (typeof window === "undefined") return {}
+  try {
+    const raw = localStorage.getItem(EQUIP_MAP_KEY)
+    return raw ? (JSON.parse(raw) as Record<string, any>) : {}
+  } catch {
+    return {}
+  }
+}
+
+function saveEquipMap(map: Record<string, any>) {
+  if (typeof window === "undefined") return
+  try {
+    localStorage.setItem(EQUIP_MAP_KEY, JSON.stringify(map))
+  } catch {
+    // ignore
+  }
+}
+
+async function loadOnchainHeroes(addr: string): Promise<HeroWithToken[]> {
+  const v4 = HERO_PULL_V4_CONTRACT_ADDRESS
+    ? await fetch(`/api/wallet/heroes?owner=${addr}&contract=${HERO_PULL_V4_CONTRACT_ADDRESS}`, { cache: "no-store" }).then((r) => r.json())
+    : { tokenIds: [] }
+  const v3 = HERO_PULL_V3_CONTRACT_ADDRESS
+    ? await fetch(`/api/wallet/heroes?owner=${addr}&contract=${HERO_PULL_V3_CONTRACT_ADDRESS}`, { cache: "no-store" }).then((r) => r.json())
+    : { tokenIds: [] }
+  const v2 = HERO_PULL_V2_CONTRACT_ADDRESS
+    ? await fetch(`/api/wallet/heroes?owner=${addr}&contract=${HERO_PULL_V2_CONTRACT_ADDRESS}`, { cache: "no-store" }).then((r) => r.json())
+    : await fetch(`/api/wallet/heroes?owner=${addr}`, { cache: "no-store" }).then((r) => r.json())
+
+  const tokenIdsV4: string[] = Array.isArray(v4?.tokenIds) ? v4.tokenIds : []
+  const tokenIdsV3: string[] = Array.isArray(v3?.tokenIds) ? v3.tokenIds : []
+  const tokenIdsV2: string[] = Array.isArray(v2?.tokenIds) ? v2.tokenIds : []
+
+  const version: "v4" | "v3" | "v2" = tokenIdsV4.length ? "v4" : tokenIdsV3.length ? "v3" : "v2"
+  const tokenIds = version === "v4" ? tokenIdsV4 : version === "v3" ? tokenIdsV3 : tokenIdsV2
+
+  const rows = await Promise.all(
+    tokenIds.map(async (id) => {
+      try {
+        const url = version === "v4" ? `/api/nftv4/hero/${id}` : version === "v3" ? `/api/nftv3/hero/${id}` : `/api/nftv2/hero/${id}`
+        const j = await fetch(url, { cache: "no-store" }).then((r) => r.json())
+        return j?.hero ? ({ ...j.hero, tokenId: String(id) } as any) : null
+      } catch {
+        return null
+      }
+    })
+  )
+
+  return rows.filter(Boolean)
+}
+
 export function HeroesMasterDetail() {
-  const [heroes, setHeroes] = useState<Hero[]>([])
+  const [heroes, setHeroes] = useState<HeroWithToken[]>([])
   const [wallet, setWallet] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState<string | null>(null)
 
-  const [selected, setSelected] = useState<Hero | null>(null)
+  const [selected, setSelected] = useState<HeroWithToken | null>(null)
   const [tab, setTab] = useState<Tab>("stats")
 
   const [inventory, setInventory] = useState<Item[]>([])
@@ -97,11 +157,18 @@ export function HeroesMasterDetail() {
         setWallet(w)
 
         if (w) {
-          const list = await loadHeroes(w)
-          setHeroes(list)
-          setSelected(list[0] ?? null)
+          const list = await loadOnchainHeroes(w)
+          // hydrate equippedItems from local map
+          const map = loadEquipMap()
+          const hydrated = list.map((h) => {
+            const tid = h.tokenId ? String(h.tokenId) : null
+            const eq = tid ? map[tid] : null
+            return eq ? ({ ...h, equippedItems: eq } as any) : h
+          })
+          setHeroes(hydrated)
+          setSelected(hydrated[0] ?? null)
         } else {
-          const list = await loadLocalHeroes()
+          const list = (await loadLocalHeroes()) as HeroWithToken[]
           setHeroes(list)
           setSelected(list[0] ?? null)
         }
@@ -139,7 +206,7 @@ export function HeroesMasterDetail() {
     setInvSource(inv.source)
   }
 
-  const persistSelectedHero = async (nextHero: Hero) => {
+  const persistSelectedHero = async (nextHero: HeroWithToken) => {
     // Update selected hero in list (supabase list already updated separately)
     setSelected(nextHero)
     setHeroes((prev) => {
@@ -161,15 +228,21 @@ export function HeroesMasterDetail() {
       // ignore
     }
 
+    if (wallet && nextHero.tokenId) {
+      const map = loadEquipMap()
+      map[String(nextHero.tokenId)] = nextHero.equippedItems ?? null
+      saveEquipMap(map)
+    }
+
     // Persist local heroes collection if not wallet-connected
     if (!wallet) {
       try {
-        const list = await loadLocalHeroes()
+        const list = (await loadLocalHeroes()) as HeroWithToken[]
         const idx = list.findIndex((h) => sameHero(h, nextHero))
         if (idx !== -1) {
           const clone = [...list]
           clone[idx] = nextHero
-          saveLocalHeroes(clone)
+          saveLocalHeroes(clone as any)
         }
       } catch {
         // ignore
@@ -182,7 +255,7 @@ export function HeroesMasterDetail() {
     setBusyEquip(true)
     try {
       const { item, slot } = equipPending
-      const next: Hero = {
+      const next: HeroWithToken = {
         ...selected,
         equippedItems: {
           ...(selected.equippedItems ?? {}),
@@ -190,11 +263,7 @@ export function HeroesMasterDetail() {
         },
       }
 
-      // Persist to Supabase hero row if possible
-      if (next.dbId) {
-        await updateHeroEquippedItems(next.dbId, next.equippedItems ?? null)
-      }
-
+      // For onchain heroes we persist equippedItems locally by tokenId
       await persistSelectedHero(next)
       setEquipPending(null)
     } catch (e: any) {
