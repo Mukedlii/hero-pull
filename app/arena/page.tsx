@@ -43,13 +43,17 @@ export default function ArenaPage() {
 
       {tab === "pvp" && (
         <div className="mt-6 border border-gray-800 bg-gray-900 rounded-2xl p-5">
-          <div className="text-lg font-extrabold">PvP (Work in progress)</div>
-          <div className="text-sm text-gray-400 mt-1">
-            Next step: async matchmaking + win/loss saved server-side.
-          </div>
+          <div className="text-lg font-extrabold">PvP</div>
+          <div className="text-sm text-gray-400 mt-1">Live turn-based PvP (7s per turn)</div>
 
-          <div className="mt-4 text-xs text-gray-500">
-            For now: use Dungeon (single player). I’ll add PvP queue + challenge link next.
+          <div className="flex flex-col gap-2 mt-4">
+            <a
+              href="/pvp"
+              className="bg-purple-700 hover:bg-purple-600 text-white text-sm font-bold py-3 rounded-xl text-center"
+            >
+              ▶ Open PvP
+            </a>
+            <div className="text-xs text-gray-500 text-center">Create a match and share the link.</div>
           </div>
         </div>
       )}

@@ -31,3 +31,17 @@ create table if not exists public.player_weapons (
 
 create index if not exists player_weapons_fid_created_idx on public.player_weapons (fid, created_at desc);
 create index if not exists player_weapons_rarity_idx on public.player_weapons ((weapon->>'rarity'));
+
+-- PvP (live, realtime)
+create table if not exists public.pvp_matches (
+  id uuid primary key,
+  status text not null default 'lobby',
+  p1_wallet text not null,
+  p2_wallet text,
+  p1_hero jsonb,
+  p2_hero jsonb,
+  state jsonb,
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists pvp_matches_updated_idx on public.pvp_matches (updated_at desc);
