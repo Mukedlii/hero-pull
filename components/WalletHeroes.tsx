@@ -3,6 +3,13 @@
 import { useEffect, useState } from "react"
 import type { Hero } from "@/lib/heroes"
 
+const rarityBorder: Record<string, string> = {
+  Common: "border-gray-600",
+  Rare: "border-blue-500 shadow-[0_0_12px_#60a5fa]",
+  Epic: "border-purple-500 shadow-[0_0_15px_#c084fc]",
+  Legendary: "border-yellow-400 shadow-[0_0_20px_#ffd700]",
+}
+
 export function WalletHeroes({ onSelect }: { onSelect?: (hero: Hero & { tokenId?: string }) => void }) {
   const [wallet, setWallet] = useState<string | null>(null)
   const [heroes, setHeroes] = useState<(Hero & { tokenId: string })[]>([])
@@ -69,7 +76,7 @@ export function WalletHeroes({ onSelect }: { onSelect?: (hero: Hero & { tokenId?
             <button
               key={h.tokenId}
               onClick={() => onSelect?.(h)}
-              className="border border-gray-700 bg-gray-900 rounded-2xl p-3 text-left hover:border-purple-500"
+              className={`border bg-gray-900 rounded-2xl p-3 text-left hover:border-purple-500 ${rarityBorder[h.rarity] || "border-gray-700"}`}
             >
               <div className="flex items-center gap-3">
                 <img
