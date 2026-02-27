@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { encodeFunctionData } from "viem"
 import type { Hero } from "@/lib/heroes"
-import { HERO_PULL_V3_ABI, HERO_PULL_V3_CONTRACT_ADDRESS } from "@/lib/heroPullV3Contract"
+import { HERO_PULL_V4_ABI, HERO_PULL_V4_CONTRACT_ADDRESS } from "@/lib/heroPullV4Contract"
 
 type Rarity = Hero["rarity"]
 
@@ -46,9 +46,9 @@ export default function MergePage() {
         if (!addr) throw new Error("Wallet not connected")
         setWallet(addr)
 
-        if (!HERO_PULL_V3_CONTRACT_ADDRESS) throw new Error("Missing V3 contract")
+        if (!HERO_PULL_V4_CONTRACT_ADDRESS) throw new Error("Missing V4 contract")
 
-        const owned = await fetch(`/api/wallet/heroes?owner=${addr}&contract=${HERO_PULL_V3_CONTRACT_ADDRESS}`, {
+        const owned = await fetch(`/api/wallet/heroes?owner=${addr}&contract=${HERO_PULL_V4_CONTRACT_ADDRESS}`, {
           cache: "no-store",
         }).then((r) => r.json())
 
@@ -61,7 +61,7 @@ export default function MergePage() {
         const rows = await Promise.all(
           tokenIds.map(async (id) => {
             try {
-              const j = await fetch(`/api/nftv3/hero/${id}`, { cache: "no-store" }).then((r) => r.json())
+              const j = await fetch(`/api/nftv4/hero/${id}`, { cache: "no-store" }).then((r) => r.json())
               return j?.hero ? ({ ...j.hero, tokenId: String(id) } as any) : null
             } catch {
               return null
@@ -96,8 +96,8 @@ export default function MergePage() {
       setErr("Select exactly 3 heroes of the same rarity (Common/Rare/Epic).")
       return
     }
-    if (!HERO_PULL_V3_CONTRACT_ADDRESS) {
-      setErr("Missing V3 contract")
+    if (!HERO_PULL_V4_CONTRACT_ADDRESS) {
+      setErr("Missing V4 contract")
       return
     }
 
@@ -112,7 +112,7 @@ export default function MergePage() {
       if (!from) throw new Error("Wallet not connected")
 
       const data = encodeFunctionData({
-        abi: HERO_PULL_V3_ABI,
+        abi: HERO_PULL_V4_ABI,
         functionName: "merge",
         args: [[BigInt(selected[0]), BigInt(selected[1]), BigInt(selected[2])]],
       })
@@ -123,21 +123,21 @@ export default function MergePage() {
           {
             chainId: "0x2105",
             from,
-            to: HERO_PULL_V3_CONTRACT_ADDRESS,
+            to: HERO_PULL_V4_CONTRACT_ADDRESS,
             data,
           },
         ],
       })
 
       // refresh list
-      const owned = await fetch(`/api/wallet/heroes?owner=${from}&contract=${HERO_PULL_V3_CONTRACT_ADDRESS}`, {
+      const owned = await fetch(`/api/wallet/heroes?owner=${from}&contract=${HERO_PULL_V4_CONTRACT_ADDRESS}`, {
         cache: "no-store",
       }).then((r) => r.json())
       const tokenIds: string[] = Array.isArray(owned?.tokenIds) ? owned.tokenIds : []
       const rows = await Promise.all(
         tokenIds.map(async (id) => {
           try {
-            const j = await fetch(`/api/nftv3/hero/${id}`, { cache: "no-store" }).then((r) => r.json())
+            const j = await fetch(`/api/nftv4/hero/${id}`, { cache: "no-store" }).then((r) => r.json())
             return j?.hero ? ({ ...j.hero, tokenId: String(id) } as any) : null
           } catch {
             return null
@@ -163,7 +163,7 @@ export default function MergePage() {
 
       {heroes.length === 0 ? (
         <div className="mt-8 text-center text-gray-400">
-          No V3 heroes found. Go to <b>Stats → Migration</b> and claim V2 → V3 first.
+          No V4 heroes found. Go to <b>Stats → Migration</b> and batch-claim into V4 first.
         </div>
       ) : (
         <>

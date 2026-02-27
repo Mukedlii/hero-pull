@@ -8,7 +8,8 @@
     "deploy:weapon:base": "hardhat run --network base scripts/deploy-weapon.js",
     "deploy:herov2:base": "hardhat run --network base scripts/deploy-herov2.js",
     "deploy:weaponv2:base": "hardhat run --network base scripts/deploy-weaponv2.js",
-    "deploy:herov3:base": "hardhat run --network base scripts/deploy-herov3.js"
+    "deploy:herov3:base": "hardhat run --network base scripts/deploy-herov3.js",
+    "deploy:herov4:base": "hardhat run --network base scripts/deploy-herov4.js"
   },
   "dependencies": {
     "@openzeppelin/contracts": "^5.0.2"
