@@ -65,6 +65,7 @@ export default function BattleArena({ hero, opponent, winner, battleId, onBattle
   const [heroHp, setHeroHp] = useState(100)
   const [oppHp, setOppHp] = useState(100)
   const [activeHit, setActiveHit] = useState<Side | null>(null)
+  const [hitPop, setHitPop] = useState<{ side: Side; amount: number; k: number } | null>(null)
   const [log, setLog] = useState<string[]>([])
 
   useEffect(() => {
@@ -114,21 +115,31 @@ export default function BattleArena({ hero, opponent, winner, battleId, onBattle
       const baseT = (r - 1) * 1100
 
       push(() => {
+        const dmg = heroDmg[r - 1]
         setRound(r)
         setActiveHit('opponent')
-        setOppHp((hp) => Math.max(0, hp - heroDmg[r - 1]))
-        setLog((l) => [...l, `Round ${r}: ${hero.name} hits for ${heroDmg[r - 1]}`])
+        setHitPop({ side: 'opponent', amount: dmg, k: Date.now() + r })
+        setOppHp((hp) => Math.max(0, hp - dmg))
+        setLog((l) => [...l, `Round ${r}: ${hero.name} hits for ${dmg}`])
       }, baseT + 250)
 
-      push(() => setActiveHit(null), baseT + 520)
+      push(() => {
+        setActiveHit(null)
+        setHitPop(null)
+      }, baseT + 520)
 
       push(() => {
+        const dmg = oppDmg[r - 1]
         setActiveHit('hero')
-        setHeroHp((hp) => Math.max(0, hp - oppDmg[r - 1]))
-        setLog((l) => [...l, `Round ${r}: ${opponent.name} hits for ${oppDmg[r - 1]}`])
+        setHitPop({ side: 'hero', amount: dmg, k: Date.now() + r + 10 })
+        setHeroHp((hp) => Math.max(0, hp - dmg))
+        setLog((l) => [...l, `Round ${r}: ${opponent.name} hits for ${dmg}`])
       }, baseT + 700)
 
-      push(() => setActiveHit(null), baseT + 950)
+      push(() => {
+        setActiveHit(null)
+        setHitPop(null)
+      }, baseT + 950)
     }
 
     return () => {
@@ -154,13 +165,19 @@ export default function BattleArena({ hero, opponent, winner, battleId, onBattle
     const eff = side === 'hero' ? heroEff : oppEff
     const hp = side === 'hero' ? heroHp : oppHp
     const hit = activeHit === side
+    const pop = hitPop?.side === side ? hitPop : null
 
     return (
       <div
         className={`relative w-[170px] p-3 rounded-2xl border-2 bg-gray-950/60 ${rarityBorder[h.rarity]} ${
           winner === side ? 'ring-2 ring-yellow-300' : ''
-        } ${hit ? 'battle-hit' : ''} ${eff.setBonus.setName ? 'border-[#f97316] shadow-[0_0_22px_#f97316]' : ''}`}
+        } ${hit ? 'battle-hit battle-flash' : ''} ${eff.setBonus.setName ? 'border-[#f97316] shadow-[0_0_22px_#f97316]' : ''}`}
       >
+        {pop ? (
+          <div key={pop.k} className="battle-dmg-pop">
+            -{pop.amount}
+          </div>
+        ) : null}
         <div className="text-xs text-gray-400">{side === 'hero' ? 'You' : 'Enemy'}</div>
         <div className="text-sm font-extrabold truncate">{h.name}</div>
 
