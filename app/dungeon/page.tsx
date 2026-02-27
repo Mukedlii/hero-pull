@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import frameSdk from "@farcaster/frame-sdk"
-import type { Hero } from "@/lib/heroes"
+import { coerceHero, type Hero } from "@/lib/heroes"
 import type { EquippedItems, Item, ItemRarity, ItemSlot } from "@/lib/items"
 import { FULL_SET_BONUS, generateItem, getEquippedBonuses, getSetBonus } from "@/lib/items"
 import { addItemToInventory } from "@/lib/inventory"
@@ -393,9 +393,17 @@ export default function DungeonPage() {
       try {
         const raw = typeof window !== "undefined" ? localStorage.getItem(CURRENT_HERO_KEY) : null
         const parsed = safeJsonParse<any | null>(raw, null)
+        const coerced = coerceHero(parsed)
         setHeroRaw(parsed)
-        setHero(parsed as Hero)
-        setEquipped(readEquippedForHero(parsed) ?? {})
+        setHero(coerced)
+        setEquipped(readEquippedForHero(coerced ?? parsed) ?? {})
+
+        // self-heal legacy storage so UI doesn't show NaN
+        try {
+          if (coerced) localStorage.setItem(CURRENT_HERO_KEY, JSON.stringify(coerced))
+        } catch {
+          // ignore
+        }
 
         const entryPots = capPotionsAtEntry(loadPotionCounts(), 5)
         savePotionCounts(entryPots)

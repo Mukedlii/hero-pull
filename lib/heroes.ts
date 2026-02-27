@@ -25,6 +25,73 @@ export type Hero = {
   dbId?: string
 }
 
+/**
+ * Backward-compatible coercion for heroes stored in localStorage/Supabase.
+ * Accepts legacy shape: { attack, defense, speed, power } where `power` used to be ability.
+ */
+export function coerceHero(raw: any): Hero | null {
+  if (!raw || typeof raw !== "object") return null
+
+  const name = typeof raw.name === "string" ? raw.name : "Hero"
+  const rarity = (raw.rarity as Hero["rarity"]) || "Common"
+  const gender = (raw.gender as Hero["gender"]) || "Unknown"
+  const imageUrl = typeof raw.imageUrl === "string" ? raw.imageUrl : "/og.png"
+
+  // New shape
+  const hasNewStats = raw.health != null || raw.luck != null || raw.ability != null
+
+  // Legacy shape
+  const legacyAttack = raw.attack
+  const legacyDefense = raw.defense
+  const legacySpeed = raw.speed
+  const legacyPower = raw.power
+
+  const num = (v: any, fallback: number) => {
+    const n = Number(v)
+    return Number.isFinite(n) ? n : fallback
+  }
+
+  const xp = num(raw.xp, 0)
+  const level = num(raw.level, 1)
+
+  if (hasNewStats) {
+    const ability = typeof raw.ability === "string" ? raw.ability : typeof legacyPower === "string" ? legacyPower : "Unknown"
+    return {
+      name,
+      gender,
+      ability,
+      rarity,
+      imageUrl,
+      health: num(raw.health, num(legacyAttack, 10)),
+      power: num(raw.power, num(legacyAttack, 10)),
+      defense: num(raw.defense, num(legacyDefense, 10)),
+      luck: num(raw.luck, num(legacySpeed, 10)),
+      xp,
+      level,
+      equippedItems: raw.equippedItems ?? undefined,
+      dbId: typeof raw.dbId === "string" ? raw.dbId : undefined,
+    }
+  }
+
+  // Pure legacy
+  const ability = typeof legacyPower === "string" ? legacyPower : "Unknown"
+  return {
+    name,
+    gender,
+    ability,
+    rarity,
+    imageUrl,
+    health: num(legacyAttack, 10),
+    power: num(legacyAttack, 10),
+    defense: num(legacyDefense, 10),
+    luck: num(legacySpeed, 10),
+    xp,
+    level,
+    equippedItems: raw.equippedItems ?? undefined,
+    dbId: typeof raw.dbId === "string" ? raw.dbId : undefined,
+  }
+}
+
 const names = [
   "Shadow Viper",
   "Iron Fist",

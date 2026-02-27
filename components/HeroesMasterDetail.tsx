@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import type { Hero } from "@/lib/heroes"
+import { coerceHero, type Hero } from "@/lib/heroes"
 import type { Item, ItemRarity, ItemSlot } from "@/lib/items"
 import { getEquippedBonuses, getSetBonus } from "@/lib/items"
 import { loadInventory } from "@/lib/inventory"
@@ -221,7 +221,7 @@ export function HeroesMasterDetail() {
     // Keep current hero in sync (best-effort)
     try {
       const raw = localStorage.getItem(CURRENT_HERO_KEY)
-      const current = raw ? (JSON.parse(raw) as Hero) : null
+      const current = raw ? coerceHero(JSON.parse(raw)) : null
       if (!current || sameHero(current, nextHero)) {
         localStorage.setItem(CURRENT_HERO_KEY, JSON.stringify(nextHero))
       }
@@ -381,7 +381,7 @@ export function HeroesMasterDetail() {
               <button
                 onClick={() => {
                   try {
-                    localStorage.setItem(CURRENT_HERO_KEY, JSON.stringify(selected))
+                    localStorage.setItem(CURRENT_HERO_KEY, JSON.stringify(coerceHero(selected) ?? selected))
                     window.location.href = "/arena"
                   } catch {
                     window.location.href = "/arena"
