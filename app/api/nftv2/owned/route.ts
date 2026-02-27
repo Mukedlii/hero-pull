@@ -30,7 +30,11 @@ export async function GET(req: NextRequest) {
     const client = createPublicClient({ chain: base, transport: http(rpcUrl) })
 
     const latest = await client.getBlockNumber()
-    const fromBlock = 0n
+    const lookbackParam = searchParams.get("lookback")
+    const lookback = lookbackParam ? BigInt(lookbackParam) : 200_000n
+    const fromBlock = latest > lookback ? latest - lookback : 0n
+
+    const fast = searchParams.get("fast") === "1"
 
     const transferTopic = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
     const toTopic = ("0x" + address.toLowerCase().slice(2).padStart(64, "0")) as `0x${string}`
@@ -61,25 +65,32 @@ export async function GET(req: NextRequest) {
 
     const unique = Array.from(new Set(tokenIds.map((x) => x.toString()))).map((s) => BigInt(s))
 
-    const owned: bigint[] = []
-    for (const id of unique) {
-      try {
-        const owner = await (client as any).readContract({
-          address: HERO_PULL_V2_CONTRACT_ADDRESS,
-          abi,
-          functionName: "ownerOf",
-          args: [id],
-        })
-        if (String(owner).toLowerCase() === address.toLowerCase()) owned.push(id)
-      } catch {
-        // ignore
+    let owned: bigint[] = unique
+
+    if (!fast) {
+      owned = []
+      for (const id of unique) {
+        try {
+          const owner = await (client as any).readContract({
+            address: HERO_PULL_V2_CONTRACT_ADDRESS,
+            abi,
+            functionName: "ownerOf",
+            args: [id],
+          })
+          if (String(owner).toLowerCase() === address.toLowerCase()) owned.push(id)
+        } catch {
+          // ignore
+        }
       }
     }
 
     return NextResponse.json({
       contract: HERO_PULL_V2_CONTRACT_ADDRESS,
       address,
+      fromBlock: fromBlock.toString(),
+      latest: latest.toString(),
       tokenIds: owned.map((x) => x.toString()),
+      fast,
     })
   } catch (e: any) {
     return NextResponse.json({ error: String(e?.message || e) }, { status: 500 })

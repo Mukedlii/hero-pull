@@ -318,7 +318,7 @@ async function loadOwnedHeroes(){
 
   // Always use full owned scan (chunked server-side) so we don't miss older mints.
   // V2-owned heroes (claimed/migrated)
-  const owned = await fetch(`/api/nftv2/owned?address=${encodeURIComponent(addr)}`, { cache:'no-store' })
+  const owned = await fetch(`/api/nftv2/owned?address=${encodeURIComponent(addr)}&fast=1&lookback=400000`, { cache:'no-store' })
     .then(r=>r.json())
     .catch((e)=>({ error: String(e) }));
 
@@ -327,7 +327,10 @@ async function loadOwnedHeroes(){
   const tokenIds = Array.isArray(owned?.tokenIds) ? owned.tokenIds : [];
   if(!tokenIds.length) return { addr, heroes: [], err: 'no_tokens' };
 
-  const rows = await Promise.all(tokenIds.map(async (id)=>{
+  // Only fetch details for 3 random heroes (fast UI)
+  const shuffled = [...tokenIds].sort(()=>Math.random()-.5).slice(0,3);
+
+  const rows = await Promise.all(shuffled.map(async (id)=>{
     try{
       const j = await fetch(`/api/nftv2/hero/${id}`, { cache:'no-store' }).then(r=>r.json());
       const h = j?.hero;
@@ -436,7 +439,7 @@ async function goSelect() {
   showScr('hero-select');
 
   const wrap = document.getElementById('hero-cards');
-  wrap.innerHTML='<div style="font-size:7px;color:#888;text-align:center;width:100%">Loading your NFT heroes… (can take ~10-20s)</div>';
+  wrap.innerHTML='<div style="font-size:7px;color:#888;text-align:center;width:100%">Loading your NFT heroes…</div>';
 
   let res = null;
   try{
