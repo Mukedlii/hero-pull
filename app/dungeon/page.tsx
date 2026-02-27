@@ -371,6 +371,7 @@ export default function DungeonPage() {
 
   const [log, setLog] = useState<string[]>([])
   const [loot, setLoot] = useState<Item | null>(null)
+  const [lootFx, setLootFx] = useState<"common" | "rare" | "epic" | "legendary" | "set" | "">("")
   const [shopItems, setShopItems] = useState<Item[]>([])
 
   const [busy, setBusy] = useState(false)
@@ -455,7 +456,7 @@ export default function DungeonPage() {
       ...progress,
       current_level: L,
       current_floor: F,
-      total_runs: progress.total_runs + 1,
+      total_dungeon_runs: progress.total_dungeon_runs + 1,
     }
     await persistProgress(nextProgress)
   }
@@ -510,6 +511,7 @@ export default function DungeonPage() {
       } else {
         const it = generateDropForDepth(depth)
         setLoot(it)
+        triggerLootFx(it)
         appendLog(`🎁 Found gear: ${it.name} (${it.rarity}${it.set ? ` / ${it.set}` : ""}).`)
       }
       return
@@ -610,6 +612,7 @@ export default function DungeonPage() {
     if (!e.boss && Math.random() < levelCfg.itemDropRate) {
       const it = generateDropForDepth(depth)
       setLoot(it)
+      triggerLootFx(it)
       appendLog(`🎁 Loot dropped: ${it.name} (${it.rarity}${it.set ? ` / ${it.set}` : ""}).`)
     }
 
@@ -617,11 +620,12 @@ export default function DungeonPage() {
     if (e.boss) {
       const reward = generateUnlockReward(levelCfg.unlockRewardRarity, depth)
       setLoot(reward)
+      triggerLootFx(reward)
       appendLog(`🏆 Level cleared reward: ${reward.name} (${reward.rarity}${reward.set ? ` / ${reward.set}` : ""}).`)
 
       const nextProgress: DungeonProgress = {
         ...progress,
-        total_bosses: progress.total_bosses + 1,
+        total_bosses_killed: progress.total_bosses_killed + 1,
         highest_level_cleared: Math.max(progress.highest_level_cleared, level),
         highest_floor_cleared: 10,
         current_level: Math.min(10, level + 1),
@@ -729,6 +733,12 @@ export default function DungeonPage() {
 
     setPlayerTurn(false)
     setTimeout(() => enemyAct(enemy, true), 650)
+  }
+
+  const triggerLootFx = (it: Item) => {
+    const fx = it.rarity === "Set" ? "set" : it.rarity === "Legendary" ? "legendary" : it.rarity === "Epic" ? "epic" : it.rarity === "Rare" ? "rare" : "common"
+    setLootFx(fx)
+    setTimeout(() => setLootFx(""), 900)
   }
 
   const equipItem = (it: Item) => {
@@ -1064,17 +1074,32 @@ export default function DungeonPage() {
           <div className="mt-4 grid grid-cols-2 gap-2">
             {DUNGEON_LEVELS.map((lv) => {
               const unlocked = canSelectLevel(lv.level)
-              const active = selectedLevel === lv.level
+              const selected = selectedLevel === lv.level
+              const cleared = lv.level <= progress.highest_level_cleared
+              const isCurrent = lv.level === progress.current_level
+
               return (
                 <button
                   key={lv.level}
                   disabled={!unlocked}
                   onClick={() => setSelectedLevel(lv.level)}
-                  className={`text-left border rounded-2xl p-3 ${active ? "border-indigo-500 bg-indigo-500/10" : "border-gray-800 bg-gray-950/30"} ${!unlocked ? "opacity-50" : "hover:border-gray-600"}`}
+                  className={
+                    `text-left border rounded-2xl p-3 transition ` +
+                    (selected ? "border-indigo-500 bg-indigo-500/10 " : "border-gray-800 bg-gray-950/30 ") +
+                    (!unlocked ? "opacity-50 " : "hover:border-gray-600 ") +
+                    (isCurrent ? "shadow-[0_0_18px_rgba(192,132,252,0.35)] " : "")
+                  }
                 >
-                  <div className="text-xs font-extrabold">Level {lv.level} {unlocked ? "" : "🔒"}</div>
-                  <div className="text-[11px] text-gray-400 mt-1 truncate">{lv.name}</div>
-                  <div className="text-[11px] text-gray-500">{lv.difficulty} • Reward: {lv.unlockRewardRarity}</div>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-xs font-extrabold">Level {lv.level} {!unlocked ? "🔒" : cleared ? "✅" : ""}</div>
+                    {isCurrent ? (
+                      <div className="text-[10px] font-extrabold text-purple-300 border border-purple-500/40 bg-purple-500/10 px-2 py-0.5 rounded-full">
+                        CURRENT
+                      </div>
+                    ) : null}
+                  </div>
+                  <div className="text-[11px] text-gray-200 mt-1 truncate">{lv.name}</div>
+                  <div className="text-[11px] text-gray-500">Reward: {lv.unlockRewardRarity}</div>
                 </button>
               )
             })}
@@ -1246,17 +1271,28 @@ export default function DungeonPage() {
 
           {/* Loot */}
           {loot ? (
-            <div className={`mt-4 border-2 rounded-2xl p-4 bg-gray-950/30 ${rarityBorder(loot.rarity)}`}>
-              <div className="text-sm font-extrabold">🎁 Loot</div>
-              <div className="mt-1 text-xs text-gray-300 font-bold">{loot.imageEmoji} {loot.name}</div>
+            <div
+              className={`mt-4 border-2 rounded-2xl p-4 bg-gray-950/30 ${rarityBorder(loot.rarity)} ${
+                lootFx === "legendary" ? "ring-2 ring-yellow-300/70 shadow-[0_0_35px_#ffd700]" :
+                lootFx === "set" ? "ring-2 ring-[#f97316]/70 shadow-[0_0_40px_#f97316]" :
+                lootFx === "epic" ? "ring-2 ring-purple-300/50" :
+                lootFx === "rare" ? "ring-2 ring-blue-300/40" : ""
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <div className="text-sm font-extrabold">🎁 Loot</div>
+                {lootFx === "legendary" && <div className="text-[10px] font-extrabold text-yellow-300">⚡ LEGENDARY DROP!</div>}
+                {lootFx === "set" && <div className="text-[10px] font-extrabold text-[#f97316]">🔥 SET ITEM DROPPED!</div>}
+              </div>
+
+              <div className="mt-2 text-xs text-gray-200 font-bold">{loot.imageEmoji} {loot.name}</div>
               <div className="text-[11px] text-gray-400">{loot.rarity} • {slotLabel(loot.slot)}{loot.set ? ` • Set ${loot.set}` : ""}</div>
-              <div className="text-[11px] text-gray-300 mt-1">+{loot.bonusATK} ATK • +{loot.bonusDEF} DEF • +{loot.bonusSPD} SPD</div>
+              <div className="text-[11px] text-gray-300 mt-1">ATK+{loot.bonusATK} DEF+{loot.bonusDEF} SPD+{loot.bonusSPD}</div>
 
               <div className="mt-3 grid grid-cols-2 gap-2">
-                <button onClick={() => equipItem(loot)} className="bg-green-700 hover:bg-green-600 text-white font-extrabold py-2 rounded-xl text-xs">Equip</button>
-                <button disabled={busy} onClick={() => saveLootToInventory(loot).catch(() => {})} className="bg-indigo-700 hover:bg-indigo-600 disabled:opacity-50 text-white font-extrabold py-2 rounded-xl text-xs">Save</button>
+                <button onClick={() => { equipItem(loot); setLoot(null) }} className="bg-green-700 hover:bg-green-600 text-white font-extrabold py-2 rounded-xl text-xs">EQUIP</button>
+                <button disabled={busy} onClick={() => saveLootToInventory(loot).then(() => setLoot(null)).catch(() => {})} className="bg-indigo-700 hover:bg-indigo-600 disabled:opacity-50 text-white font-extrabold py-2 rounded-xl text-xs">SAVE TO BAG</button>
               </div>
-              <div className="mt-2 text-[11px] text-gray-500">Equip updates your hero’s equipped items; Save adds it to your inventory.</div>
             </div>
           ) : null}
 

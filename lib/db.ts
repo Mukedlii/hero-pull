@@ -159,8 +159,8 @@ export async function saveStats(
     current_floor?: number
     highest_level_cleared?: number
     highest_floor_cleared?: number
-    total_runs?: number
-    total_bosses?: number
+    total_dungeon_runs?: number
+    total_bosses_killed?: number
   }
 ) {
   const { error } = await supabase().from("player_stats").upsert({
