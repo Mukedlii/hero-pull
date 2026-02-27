@@ -1222,6 +1222,15 @@ export default function DungeonPage() {
             </div>
           ) : null}
 
+          {(room === "battle" || room === "boss") && !enemy && !inBattle ? (
+            <div className="mt-3">
+              <div className="text-xs text-gray-400">Enemy defeated.</div>
+              <button onClick={() => nextFloor().catch(() => {})} className="mt-3 w-full bg-yellow-600 hover:bg-yellow-500 text-white font-extrabold py-3 rounded-xl">
+                ▶ Next
+              </button>
+            </div>
+          ) : null}
+
           {room === "shop" ? (
             <div className="mt-3">
               <div className="text-xs text-gray-400">Buys spend your wallet gold (hero-pull-gold) and save items to inventory.</div>
