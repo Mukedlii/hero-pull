@@ -2,6 +2,9 @@
 
 import { useEffect, useState } from "react"
 import type { Hero } from "@/lib/heroes"
+import { HERO_PULL_V2_CONTRACT_ADDRESS } from "@/lib/heroPullV2Contract"
+import { HERO_PULL_V3_CONTRACT_ADDRESS } from "@/lib/heroPullV3Contract"
+import { HERO_PULL_V4_CONTRACT_ADDRESS } from "@/lib/heroPullV4Contract"
 
 const rarityBorder: Record<string, string> = {
   Common: "border-gray-600",
@@ -34,14 +37,22 @@ export function WalletHeroes({ onSelect }: { onSelect?: (hero: Hero & { tokenId?
         if (!addr) throw new Error("Wallet not connected")
         setWallet(addr)
 
-        const v2 = await fetch(`/api/wallet/heroes?owner=${addr}`, { cache: "no-store" }).then((r) => r.json())
-        const v3 = await fetch(`/api/wallet/heroes?owner=${addr}&contract=${encodeURIComponent("0x951144FAea2d756556e8cE6131FFd2038A6ae2D9")}`, { cache: "no-store" }).then((r) => r.json())
+        const v4 = HERO_PULL_V4_CONTRACT_ADDRESS
+          ? await fetch(`/api/wallet/heroes?owner=${addr}&contract=${HERO_PULL_V4_CONTRACT_ADDRESS}`, { cache: "no-store" }).then((r) => r.json())
+          : { tokenIds: [] }
+        const v3 = HERO_PULL_V3_CONTRACT_ADDRESS
+          ? await fetch(`/api/wallet/heroes?owner=${addr}&contract=${HERO_PULL_V3_CONTRACT_ADDRESS}`, { cache: "no-store" }).then((r) => r.json())
+          : { tokenIds: [] }
+        const v2 = HERO_PULL_V2_CONTRACT_ADDRESS
+          ? await fetch(`/api/wallet/heroes?owner=${addr}&contract=${HERO_PULL_V2_CONTRACT_ADDRESS}`, { cache: "no-store" }).then((r) => r.json())
+          : await fetch(`/api/wallet/heroes?owner=${addr}`, { cache: "no-store" }).then((r) => r.json())
 
+        const tokenIdsV4: string[] = Array.isArray(v4?.tokenIds) ? v4.tokenIds : []
         const tokenIdsV3: string[] = Array.isArray(v3?.tokenIds) ? v3.tokenIds : []
         const tokenIdsV2: string[] = Array.isArray(v2?.tokenIds) ? v2.tokenIds : []
 
-        const useV3 = tokenIdsV3.length > 0
-        const tokenIds = useV3 ? tokenIdsV3 : tokenIdsV2
+        const version: "v4" | "v3" | "v2" = tokenIdsV4.length ? "v4" : tokenIdsV3.length ? "v3" : "v2"
+        const tokenIds = version === "v4" ? tokenIdsV4 : version === "v3" ? tokenIdsV3 : tokenIdsV2
 
         if (!tokenIds.length) {
           setHeroes([])
@@ -51,7 +62,7 @@ export function WalletHeroes({ onSelect }: { onSelect?: (hero: Hero & { tokenId?
         const rows = await Promise.all(
           tokenIds.map(async (id) => {
             try {
-              const url = useV3 ? `/api/nftv3/hero/${id}` : `/api/nftv2/hero/${id}`
+              const url = version === "v4" ? `/api/nftv4/hero/${id}` : version === "v3" ? `/api/nftv3/hero/${id}` : `/api/nftv2/hero/${id}`
               const j = await fetch(url, { cache: "no-store" }).then((r) => r.json())
               return j?.hero ? ({ ...j.hero, tokenId: String(id) } as any) : null
             } catch {

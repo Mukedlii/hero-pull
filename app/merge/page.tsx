@@ -20,6 +20,7 @@ export default function MergePage() {
   const [selected, setSelected] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string>("")
+  const [lastTx, setLastTx] = useState<string>("")
 
   const selectedHeroes = useMemo(() => {
     const set = new Set(selected)
@@ -117,7 +118,13 @@ export default function MergePage() {
         args: [[BigInt(selected[0]), BigInt(selected[1]), BigInt(selected[2])]],
       })
 
-      await provider.request({
+      // pre-state for polling
+      const ownedBefore = await fetch(`/api/wallet/heroes?owner=${from}&contract=${HERO_PULL_V4_CONTRACT_ADDRESS}`, {
+        cache: "no-store",
+      }).then((r) => r.json())
+      const tokenIdsBefore: string[] = Array.isArray(ownedBefore?.tokenIds) ? ownedBefore.tokenIds : []
+
+      const txHash = (await provider.request({
         method: "eth_sendTransaction",
         params: [
           {
@@ -127,13 +134,19 @@ export default function MergePage() {
             data,
           },
         ],
-      })
+      })) as string
+      setLastTx(txHash)
 
-      // refresh list
-      const owned = await fetch(`/api/wallet/heroes?owner=${from}&contract=${HERO_PULL_V4_CONTRACT_ADDRESS}`, {
-        cache: "no-store",
-      }).then((r) => r.json())
-      const tokenIds: string[] = Array.isArray(owned?.tokenIds) ? owned.tokenIds : []
+      // refresh list (poll a bit; tx may not be mined yet)
+      let tokenIds: string[] = tokenIdsBefore
+      for (let attempt = 0; attempt < 10; attempt++) {
+        const owned = await fetch(`/api/wallet/heroes?owner=${from}&contract=${HERO_PULL_V4_CONTRACT_ADDRESS}`, {
+          cache: "no-store",
+        }).then((r) => r.json())
+        tokenIds = Array.isArray(owned?.tokenIds) ? owned.tokenIds : []
+        if (tokenIds.length !== tokenIdsBefore.length) break
+        await new Promise((r) => setTimeout(r, 1200))
+      }
       const rows = await Promise.all(
         tokenIds.map(async (id) => {
           try {
@@ -156,7 +169,7 @@ export default function MergePage() {
   return (
     <div className="px-4 pb-24">
       <h1 className="text-2xl font-extrabold text-center mt-6">Merge</h1>
-      <p className="text-center text-gray-400 mt-2 text-sm">Onchain merge (V3): burn 3 → mint 1 next tier</p>
+      <p className="text-center text-gray-400 mt-2 text-sm">Onchain merge (V4): burn 3 → mint 1 next tier</p>
 
       {wallet && <div className="mt-2 text-center text-xs text-gray-500">Wallet: {wallet.slice(0, 6)}…{wallet.slice(-4)}</div>}
       {err && <div className="mt-3 text-center text-xs text-red-400">{err}</div>}
@@ -182,35 +195,38 @@ export default function MergePage() {
             </button>
           </div>
 
+          {lastTx && (
+            <div className="mt-4 text-center text-[10px] text-gray-500 break-all">
+              Tx: {lastTx}
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-3 mt-6">
-            {heroes
-              .filter((h) => h.rarity !== "Legendary")
-              .map((h) => {
-                const active = selected.includes(h.tokenId)
-                const disabled =
-                  selected.length > 0 &&
-                  !active &&
-                  selectedHeroes[0] &&
-                  selectedHeroes[0].rarity !== h.rarity
-                return (
-                  <button
-                    key={h.tokenId}
-                    onClick={() => toggle(h.tokenId)}
-                    disabled={disabled || busy}
-                    className={`border-2 rounded-xl p-3 flex flex-col items-center gap-2 bg-gray-900 text-left ${rarityBorder[h.rarity]} ${
-                      active ? "ring-2 ring-white/60" : ""
-                    } disabled:opacity-40`}
-                  >
-                    <img src={h.imageUrl} className="w-16 h-16 rounded-xl object-cover" alt={h.name} />
-                    <div className="text-xs text-gray-500">#{h.tokenId}</div>
-                    <div className="font-bold text-sm text-center leading-tight">{h.name}</div>
-                    <div className="text-xs text-gray-400">{h.rarity} • Lv.{h.level}</div>
-                  </button>
-                )
-              })}
+            {heroes.map((h) => {
+              const active = selected.includes(h.tokenId)
+              const mismatch = selected.length > 0 && !active && selectedHeroes[0] && selectedHeroes[0].rarity !== h.rarity
+              const isLegendary = h.rarity === "Legendary"
+              const disabled = busy || isLegendary || mismatch
+              return (
+                <button
+                  key={h.tokenId}
+                  onClick={() => toggle(h.tokenId)}
+                  disabled={disabled}
+                  className={`border-2 rounded-xl p-3 flex flex-col items-center gap-2 bg-gray-900 text-left ${rarityBorder[h.rarity]} ${
+                    active ? "ring-2 ring-white/60" : ""
+                  } disabled:opacity-40`}
+                >
+                  <img src={h.imageUrl} className="w-16 h-16 rounded-xl object-cover" alt={h.name} />
+                  <div className="text-xs text-gray-500">#{h.tokenId}</div>
+                  <div className="font-bold text-sm text-center leading-tight">{h.name}</div>
+                  <div className="text-xs text-gray-400">{h.rarity} • Lv.{h.level}</div>
+                  {isLegendary && <div className="text-[10px] text-yellow-300 font-bold">LEGENDARY</div>}
+                </button>
+              )
+            })}
           </div>
 
-          <div className="mt-6 text-center text-xs text-gray-500">Legendary heroes can’t be merged.</div>
+          <div className="mt-6 text-center text-xs text-gray-500">Legendary heroes can’t be merged (but they show here).</div>
         </>
       )}
     </div>
