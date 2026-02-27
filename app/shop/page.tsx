@@ -10,6 +10,17 @@ import { generateItem, type ItemRarity, type ItemSlot } from "@/lib/items"
 
 type Tab = "gold" | "premium"
 
+const PREMIUM_TREASURY = "0xa782922Ff9c54F4264FD049189eC66940f528Eb0" as const
+
+const PREMIUM_PRICE_WEI = {
+  epic: 400000000000000n, // 0.0004
+  legendary: 800000000000000n, // 0.0008
+  dragonPiece: 1200000000000000n, // 0.0012
+  dragonSet: 3600000000000000n, // 0.0036
+} as const
+
+type PremiumSku = keyof typeof PREMIUM_PRICE_WEI
+
 type RequestArgs = { method: string; params?: any[] }
 
 const BASE_CHAIN_ID_HEX = "0x2105" // 8453
@@ -58,36 +69,39 @@ function rarityBorder(r: ItemRarity): string {
   return "border-[#f97316] shadow-[0_0_22px_#f97316]"
 }
 
-function pickPremiumReward(): Item {
-  // Premium pack rewards: random Epic/Legendary OR Dragon set piece
-  const roll = Math.random() * 100
-  if (roll < 35) {
-    // Dragon set piece
-    let it = generateItem()
-    for (let i = 0; i < 200 && !(it.rarity === "Set" && it.set === "Dragon"); i++) it = generateItem()
-    if (!(it.rarity === "Set" && it.set === "Dragon")) {
-      // fallback if RNG failed
-      const slot: ItemSlot = (["weapon", "shield", "boots", "helmet"] as ItemSlot[])[Math.floor(Math.random() * 4)]
-      it = {
-        id: it.id,
-        name: slot === "weapon" ? "Dragonfang Blade" : slot === "shield" ? "Dragonhide Aegis" : slot === "boots" ? "Dragonstep Greaves" : "Dragoncrest Helm",
-        slot,
-        rarity: "Set",
-        bonusATK: slot === "weapon" ? 65 : slot === "shield" ? 10 : slot === "boots" ? 10 : 25,
-        bonusDEF: slot === "weapon" ? 10 : slot === "shield" ? 65 : slot === "boots" ? 10 : 25,
-        bonusSPD: slot === "weapon" ? 10 : slot === "shield" ? 10 : slot === "boots" ? 65 : 25,
-        imageEmoji: "🐉",
-        set: "Dragon",
-      }
-    }
-    return it
-  }
-
-  const target: ItemRarity = roll < 78 ? "Epic" : "Legendary"
+function pickByRarity(target: ItemRarity): Item {
   let it = generateItem()
-  for (let i = 0; i < 200 && it.rarity !== target; i++) it = generateItem()
+  for (let i = 0; i < 350 && it.rarity !== target; i++) it = generateItem()
   if (it.rarity !== target) it = { ...it, rarity: target }
   return it
+}
+
+function pickDragonSetPiece(): Item {
+  let it = generateItem()
+  for (let i = 0; i < 400 && !(it.rarity === "Set" && it.set === "Dragon"); i++) it = generateItem()
+  if (it.rarity === "Set" && it.set === "Dragon") return it
+
+  // fallback
+  const slot: ItemSlot = (["weapon", "shield", "boots", "helmet"] as ItemSlot[])[Math.floor(Math.random() * 4)]
+  return {
+    id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+    name: slot === "weapon" ? "Dragon Blade" : slot === "shield" ? "Dragon Shield" : slot === "boots" ? "Dragon Boots" : "Dragon Helm",
+    slot,
+    rarity: "Set",
+    bonusATK: slot === "weapon" ? 120 : slot === "shield" ? 20 : slot === "boots" ? 20 : 60,
+    bonusDEF: slot === "weapon" ? 20 : slot === "shield" ? 120 : slot === "boots" ? 20 : 60,
+    bonusSPD: slot === "weapon" ? 20 : slot === "shield" ? 20 : slot === "boots" ? 120 : 60,
+    imageEmoji: "🐉",
+    set: "Dragon",
+  }
+}
+
+function pickRandomLegendary(): Item {
+  return pickByRarity("Legendary")
+}
+
+function pickRandomEpic(): Item {
+  return pickByRarity("Epic")
 }
 
 export default function ShopPage() {
@@ -138,17 +152,9 @@ export default function ShopPage() {
     }
   }
 
-  const buyPremium = async () => {
+  const buyPremium = async (sku: PremiumSku) => {
     setErr("")
     setMsg("")
-
-    const to = process.env.NEXT_PUBLIC_PREMIUM_TREASURY_ADDRESS
-    const valueWeiHex = process.env.NEXT_PUBLIC_PREMIUM_PRICE_WEI_HEX
-
-    if (!to || !valueWeiHex) {
-      setErr("Premium shop is not configured (missing NEXT_PUBLIC_PREMIUM_TREASURY_ADDRESS / NEXT_PUBLIC_PREMIUM_PRICE_WEI_HEX).")
-      return
-    }
 
     if (!getProvider()) {
       setErr("No wallet provider found.")
@@ -174,25 +180,42 @@ export default function ShopPage() {
         // ignore
       }
 
+      const valueWeiHex = "0x" + PREMIUM_PRICE_WEI[sku].toString(16)
+
       const hash = (await providerRequest({
         method: "eth_sendTransaction",
         params: [
           {
             chainId: BASE_CHAIN_ID_HEX,
             from,
-            to,
+            to: PREMIUM_TREASURY,
             value: valueWeiHex,
           },
         ],
       })) as string
 
-      const reward = pickPremiumReward()
-      await addItemToInventory(reward)
+      const rewards: Item[] = []
+
+      if (sku === "epic") {
+        rewards.push(pickRandomEpic())
+      } else if (sku === "legendary") {
+        rewards.push(pickRandomLegendary())
+      } else if (sku === "dragonPiece") {
+        rewards.push(pickDragonSetPiece())
+      } else {
+        const pieces: ItemSlot[] = ["weapon", "shield", "boots", "helmet"]
+        for (const slot of pieces) {
+          const it = pickDragonSetPiece()
+          rewards.push(it.slot === slot ? it : { ...it, slot, name: slot === "weapon" ? "Dragon Blade" : slot === "shield" ? "Dragon Shield" : slot === "boots" ? "Dragon Boots" : "Dragon Helm" })
+        }
+      }
+
+      for (const r of rewards) await addItemToInventory(r)
 
       const inv = await loadInventory()
       setInventoryCount(inv.items.length)
 
-      setMsg(`Premium purchase complete. Reward: ${reward.name} (${reward.rarity}) • Tx ${hash.slice(0, 10)}…`)
+      setMsg(`Purchase complete: +${rewards.length} item(s) • Tx ${hash.slice(0, 10)}…`)
     } catch (e: any) {
       setErr(e?.message || String(e))
     } finally {
@@ -256,22 +279,69 @@ export default function ShopPage() {
       )}
 
       {tab === "premium" && (
-        <div className="mt-6 border border-gray-800 bg-gray-900 rounded-2xl p-5">
-          <div className="text-lg font-extrabold">Premium Pack</div>
-          <div className="text-sm text-gray-400 mt-1">Pay ETH on Base and receive a reward item.</div>
-          <div className="text-xs text-gray-500 mt-3">Rewards: Epic / Legendary gear, or Dragon set pieces.</div>
-
-          <button
-            disabled={busy}
-            onClick={() => buyPremium().catch(() => {})}
-            className="mt-4 w-full bg-purple-700 hover:bg-purple-600 disabled:opacity-50 text-white font-bold py-3 rounded-xl"
-          >
-            {busy ? "Processing…" : "Buy Premium"}
-          </button>
-
-          <div className="text-[11px] text-gray-500 mt-3 break-words">
-            Treasury: {process.env.NEXT_PUBLIC_PREMIUM_TREASURY_ADDRESS || "(not set)"}
+        <div className="mt-6">
+          <div className="rounded-2xl p-5 border border-purple-500/30 bg-gradient-to-r from-purple-900/30 to-yellow-900/20">
+            <div className="text-lg font-extrabold">⚡ PREMIUM ITEMS</div>
+            <div className="text-sm text-gray-300 mt-1">Exclusive items only available here</div>
           </div>
+
+          <div className="mt-4 grid grid-cols-1 gap-3">
+            <div className="border border-gray-800 bg-gray-900 rounded-2xl p-4">
+              <div className="font-extrabold">Epic Bundle</div>
+              <div className="text-xs text-gray-400 mt-1">Random Epic item</div>
+              <button
+                disabled={busy}
+                onClick={() => buyPremium("epic").catch(() => {})}
+                className="mt-3 w-full bg-purple-700 hover:bg-purple-600 disabled:opacity-50 text-white font-bold py-3 rounded-xl"
+              >
+                Buy 0.0004 ETH
+              </button>
+            </div>
+
+            <div className="border border-gray-800 bg-gray-900 rounded-2xl p-4">
+              <div className="font-extrabold">Legendary Weapon</div>
+              <div className="text-xs text-gray-400 mt-1">Random Legendary item</div>
+              <button
+                disabled={busy}
+                onClick={() => buyPremium("legendary").catch(() => {})}
+                className="mt-3 w-full bg-yellow-600 hover:bg-yellow-500 disabled:opacity-50 text-white font-bold py-3 rounded-xl"
+              >
+                Buy 0.0008 ETH
+              </button>
+            </div>
+
+            <div className="border-2 border-[#f97316] bg-gray-900 rounded-2xl p-4 shadow-[0_0_22px_#f97316]">
+              <div className="font-extrabold flex items-center justify-between">
+                <span>Dragon Set Piece</span>
+                <span className="text-[10px] font-extrabold text-[#f97316] border border-[#f97316]/60 bg-[#f97316]/10 px-2 py-0.5 rounded-full">🐉 SET ITEM</span>
+              </div>
+              <div className="text-xs text-gray-400 mt-1">Random Dragon Set piece (25% each slot)</div>
+              <button
+                disabled={busy}
+                onClick={() => buyPremium("dragonPiece").catch(() => {})}
+                className="mt-3 w-full bg-[#f97316] hover:bg-[#fb923c] disabled:opacity-50 text-black font-extrabold py-3 rounded-xl"
+              >
+                Buy 0.0012 ETH
+              </button>
+            </div>
+
+            <div className="border-2 border-[#f97316] bg-gray-900 rounded-2xl p-4 shadow-[0_0_26px_#f97316]">
+              <div className="font-extrabold flex items-center justify-between">
+                <span>Full Dragon Set</span>
+                <span className="text-[10px] font-extrabold text-yellow-200 border border-yellow-300/40 bg-yellow-500/10 px-2 py-0.5 rounded-full">🔥 BEST VALUE</span>
+              </div>
+              <div className="text-xs text-gray-400 mt-1">All 4 Dragon pieces at once</div>
+              <button
+                disabled={busy}
+                onClick={() => buyPremium("dragonSet").catch(() => {})}
+                className="mt-3 w-full bg-[#f97316] hover:bg-[#fb923c] disabled:opacity-50 text-black font-extrabold py-3 rounded-xl"
+              >
+                Buy 0.0036 ETH
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-3 text-[11px] text-gray-500 break-words">Treasury: {PREMIUM_TREASURY}</div>
         </div>
       )}
 
