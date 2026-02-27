@@ -148,9 +148,56 @@ def main():
 
             tier = roll_tier(rng)
 
-            skin = weighted_choice(rarity["base"], rng)
+            # Restrict skin/hair colors to the desired set
+            # ZIP asset keys:
+            #   base: light_peach, tan, olive, dark_brown
+            #   hair_color: black, brown, blonde, red, blue, teal, pink, white
+            # Desired (HU):
+            #   Hair: barna, fekete, szőke, vörös, kék, lila
+            #   Skin: sötét barna, világos barna, fehér, néger
+
+            # Skin mapping
+            skin_label = weighted_choice(
+                {
+                    "white": 25,
+                    "light_brown": 30,
+                    "dark_brown": 25,
+                    "black": 20,
+                },
+                rng,
+            )
+            skin_map = {
+                "white": "light_peach",
+                "light_brown": "tan",
+                "dark_brown": "olive",
+                "black": "dark_brown",
+            }
+            skin = skin_map[skin_label]
+
             hair_style = weighted_choice(rarity["hair_style"], rng)
-            hair_color = weighted_choice(rarity["hair_color"], rng)
+
+            hair_color_label = weighted_choice(
+                {
+                    "black": 28,
+                    "brown": 28,
+                    "blonde": 18,
+                    "red": 12,
+                    "blue": 8,
+                    "purple": 6,
+                },
+                rng,
+            )
+            # We don't have a purple layer; best approximation is pink.
+            hair_color_map = {
+                "black": "black",
+                "brown": "brown",
+                "blonde": "blonde",
+                "red": "red",
+                "blue": "blue",
+                "purple": "pink",
+            }
+            hair_color = hair_color_map[hair_color_label]
+
             eyes_style = weighted_choice(rarity["eyes_style"], rng)
             eyes_color = weighted_choice(rarity["eyes_color"], rng)
             mouth = weighted_choice(rarity["mouth"], rng)
@@ -187,9 +234,9 @@ def main():
                     {"trait_type": "Tier", "value": tier.name},
                     {"trait_type": "Tier Color", "value": tier.color},
                     {"trait_type": "Power", "value": power},
-                    {"trait_type": "Skin", "value": skin},
+                    {"trait_type": "Skin", "value": skin_label},
                     {"trait_type": "Hair Style", "value": hair_style},
-                    {"trait_type": "Hair Color", "value": hair_color},
+                    {"trait_type": "Hair Color", "value": hair_color_label},
                     {"trait_type": "Eyes Style", "value": eyes_style},
                     {"trait_type": "Eyes Color", "value": eyes_color},
                     {"trait_type": "Mouth", "value": mouth},
