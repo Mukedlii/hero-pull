@@ -317,7 +317,8 @@ async function loadOwnedHeroes(){
   if(!addr) return { addr: null, heroes: [], err: 'no_wallet' };
 
   // Always use full owned scan (chunked server-side) so we don't miss older mints.
-  const owned = await fetch(`/api/nft/owned?address=${encodeURIComponent(addr)}&fast=1`, { cache:'no-store' })
+  // V2-owned heroes (claimed/migrated)
+  const owned = await fetch(`/api/nftv2/owned?address=${encodeURIComponent(addr)}`, { cache:'no-store' })
     .then(r=>r.json())
     .catch((e)=>({ error: String(e) }));
 
@@ -328,7 +329,7 @@ async function loadOwnedHeroes(){
 
   const rows = await Promise.all(tokenIds.map(async (id)=>{
     try{
-      const j = await fetch(`/api/nft/hero/${id}`, { cache:'no-store' }).then(r=>r.json());
+      const j = await fetch(`/api/nftv2/hero/${id}`, { cache:'no-store' }).then(r=>r.json());
       const h = j?.hero;
       if(!h) return null;
       const atk=Number(h.attack)||0;
@@ -451,10 +452,10 @@ async function goSelect() {
     wrap.innerHTML=`
       <div class="box" style="border-color:#60a5fa;text-align:center">
         <div style="font-size:8px;color:#60a5fa">Couldn't load NFT heroes</div>
-        <div style="font-size:6px;color:#777;margin-top:6px;line-height:2">Tap connect, then retry.</div>
-        <button class="btn btn-gold" style="margin-top:10px;font-size:8px;padding:10px;width:100%" onclick="(async function(){await connectWallet(); await goSelect();})()">🔌 CONNECT WALLET</button>
+        <div style="font-size:6px;color:#777;margin-top:6px;line-height:2">You need to CLAIM your existing V1 heroes into V2 first.</div>
+        <button class="btn btn-blue" style="margin-top:10px;font-size:8px;padding:10px;width:100%" onclick="openMint()">🦸 GO TO APP (Claim)</button>
+        <button class="btn btn-gold" style="margin-top:6px;font-size:8px;padding:10px;width:100%" onclick="(async function(){await connectWallet(); await goSelect();})()">🔌 CONNECT WALLET</button>
         <button class="btn btn-blue" style="margin-top:6px;font-size:8px;padding:10px;width:100%" onclick="goSelect()">🔄 RETRY</button>
-        <button class="btn btn-blue" style="margin-top:6px;font-size:8px;padding:10px;width:100%" onclick="openMint()">⛓ MINT HERO</button>
       </div>`;
     return;
   }

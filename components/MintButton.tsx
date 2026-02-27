@@ -5,6 +5,7 @@ import frameSdk from "@farcaster/frame-sdk"
 import { generateHero, type Hero } from "@/lib/heroes"
 import { HERO_PULL_MINT_PRICE_ETH } from "@/lib/heroPullContract"
 import { getWalletAddress, loadStats, saveHero, saveStats } from "@/lib/db"
+import { HERO_PULL_V2_CONTRACT_ADDRESS } from "@/lib/heroPullV2Contract"
 
 interface Props {
   onPulled: (hero: Hero) => void
@@ -22,6 +23,8 @@ declare global {
 
 const BASE_CHAIN_ID_HEX = "0x2105" // 8453
 import { HERO_PULL_CONTRACT_ADDRESS } from "@/lib/heroPullContract"
+
+const HERO_CONTRACT = HERO_PULL_V2_CONTRACT_ADDRESS ?? HERO_PULL_CONTRACT_ADDRESS
 
 const MINT_SELECTOR = "0x1249c58b" as const // mint()
 
@@ -123,7 +126,7 @@ export default function MintButton({ onPulled }: Props) {
           {
             chainId: BASE_CHAIN_ID_HEX,
             from,
-            to: HERO_PULL_CONTRACT_ADDRESS,
+            to: HERO_CONTRACT,
             data: MINT_SELECTOR,
             value: MINT_VALUE_WEI_HEX,
           },
