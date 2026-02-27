@@ -31,6 +31,7 @@ function heroToPvP(h: Hero & { tokenId?: string }): PvPHero {
     defense: Number(h.defense || 0),
     speed: Number(h.speed || 0),
     imageUrl: h.imageUrl,
+    equippedItems: h.equippedItems,
   }
 }
 

@@ -1,66 +1,33 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { Weapon, WeaponRarity, generateWeapon, nextWeaponRarity } from "@/lib/weapons"
-import { getWalletAddress, loadWeapons, saveWeapon } from "@/lib/db"
-import { encodeFunctionData } from "viem"
-import {
-  BASE_CHAIN_ID_HEX,
-  WEAPON_ABI,
-  WEAPON_CONTRACT_ADDRESS,
-  WEAPON_MINT_PRICE_WEI_HEX,
-} from "@/lib/weaponContract"
+import { Item, ItemRarity, generateItem, nextItemRarity } from "@/lib/items"
+import { getWalletAddress, loadItems, saveItem } from "@/lib/db"
 
-// (owner withdraw UI removed)
+const ITEMS_KEY = "hero-pull-items"
 
-const WEAPONS_KEY = "hero-pull-weapons"
-
-const rarityBorder: Record<WeaponRarity, string> = {
+const rarityBorder: Record<ItemRarity, string> = {
   Common: "border-gray-600",
   Rare: "border-blue-500 shadow-[0_0_12px_#60a5fa]",
   Epic: "border-purple-500 shadow-[0_0_15px_#c084fc]",
   Legendary: "border-yellow-400 shadow-[0_0_20px_#ffd700]",
+  Set: "border-[#f97316] shadow-[0_0_22px_#f97316]",
 }
 
 export default function WeaponsPage() {
-  const [weapons, setWeapons] = useState<Weapon[]>([])
-  const [lastForged, setLastForged] = useState<Weapon | null>(null)
+  const [items, setItems] = useState<Item[]>([])
+  const [lastForged, setLastForged] = useState<Item | null>(null)
   const [fid, setFid] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
-  const [minting, setMinting] = useState(false)
-  const [wallet, setWallet] = useState<string | null>(null)
 
   useEffect(() => {
     ;(async () => {
-      // Prefer onchain inventory when wallet connected
-      try {
-        const wallet = await getWalletAddress()
-        if (wallet) {
-          setWallet(wallet)
-          const res = await fetch(`/api/weapons/onchain?address=${wallet}`, { cache: "no-store" })
-          const json = await res.json()
-          const items = Array.isArray(json?.items) ? json.items : []
-          const list: Weapon[] = []
-          for (const it of items) {
-            const qty = Number(it?.balance || 0)
-            const w = it?.weapon as Weapon
-            if (w && qty > 0) {
-              for (let i = 0; i < qty; i++) list.push({ ...w, id: `${w.id}-${i}` })
-            }
-          }
-          setWeapons(list)
-          return
-        }
-      } catch {
-        // ignore
-      }
-
       // Prefer Supabase inventory if wallet connected
       try {
         const wallet = await getWalletAddress()
         if (wallet) {
-          const list = await loadWeapons(wallet)
-          setWeapons(list)
+          const list = await loadItems(wallet)
+          setItems(list)
           return
         }
       } catch {
@@ -77,8 +44,8 @@ export default function WeaponsPage() {
         if (f) {
           const res = await fetch(`/api/weapons/list?fid=${f}`, { cache: "no-store" })
           const json = await res.json()
-          const items = Array.isArray(json?.items) ? json.items : []
-          setWeapons(items.map((it: any) => it.weapon as Weapon))
+          const rows = Array.isArray(json?.items) ? json.items : []
+          setItems(rows.map((it: any) => it.item as Item))
           return
         }
       } catch {
@@ -87,24 +54,24 @@ export default function WeaponsPage() {
 
       // Fallback 2: localStorage
       try {
-        const raw = localStorage.getItem(WEAPONS_KEY)
-        setWeapons(raw ? (JSON.parse(raw) as Weapon[]) : [])
+        const raw = localStorage.getItem(ITEMS_KEY)
+        setItems(raw ? (JSON.parse(raw) as Item[]) : [])
       } catch {
-        setWeapons([])
+        setItems([])
       }
     })()
   }, [])
 
-  const saveLocal = (list: Weapon[]) => {
-    setWeapons(list)
-    localStorage.setItem(WEAPONS_KEY, JSON.stringify(list))
+  const saveLocal = (list: Item[]) => {
+    setItems(list)
+    localStorage.setItem(ITEMS_KEY, JSON.stringify(list))
   }
 
   const refreshServer = async (f: number) => {
     const res = await fetch(`/api/weapons/list?fid=${f}`, { cache: "no-store" })
     const json = await res.json()
-    const items = Array.isArray(json?.items) ? json.items : []
-    setWeapons(items.map((it: any) => it.weapon as Weapon))
+    const rows = Array.isArray(json?.items) ? json.items : []
+    setItems(rows.map((it: any) => it.item as Item))
   }
 
   const handleForge = async () => {
@@ -114,14 +81,11 @@ export default function WeaponsPage() {
       try {
         const wallet = await getWalletAddress()
         if (wallet) {
-          const w = generateWeapon()
-          const row: any = await saveWeapon(w, wallet)
-          const list = await loadWeapons(wallet)
-          setWeapons(list)
-          setLastForged({
-            ...w,
-            id: row?.id ?? w.id,
-          })
+          const it = generateItem()
+          const row: any = await saveItem(it, wallet)
+          const list = await loadItems(wallet)
+          setItems(list)
+          setLastForged({ ...it, id: row?.id ?? it.id })
           return
         }
       } catch {
@@ -130,126 +94,67 @@ export default function WeaponsPage() {
 
       // Fallback: server (fid)
       if (fid) {
-        const res = await fetch('/api/weapons/forge', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
+        const res = await fetch("/api/weapons/forge", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
           body: JSON.stringify({ fid }),
         })
         const json = await res.json()
-        const w = json?.item?.weapon as Weapon
-        if (w) setLastForged(w)
+        const it = json?.item?.item as Item
+        if (it) setLastForged(it)
         await refreshServer(fid)
         return
       }
 
       // Fallback: localStorage
-      const w = generateWeapon()
-      const next = [w, ...weapons]
+      const it = generateItem()
+      const next = [it, ...items]
       saveLocal(next)
-      setLastForged(w)
+      setLastForged(it)
     } finally {
       setLoading(false)
     }
   }
 
   const counts = useMemo(() => {
-    const c: Record<WeaponRarity, number> = { Common: 0, Rare: 0, Epic: 0, Legendary: 0 }
-    for (const w of weapons) c[w.rarity]++
+    const c: Record<ItemRarity, number> = { Common: 0, Rare: 0, Epic: 0, Legendary: 0, Set: 0 }
+    for (const it of items) c[it.rarity]++
     return c
-  }, [weapons])
+  }, [items])
 
-  const canMergeRarity = (r: WeaponRarity) => {
-    if (!weapons.length) return false
+  const canMergeRarity = (r: Exclude<ItemRarity, "Set">) => {
+    if (!items.length) return false
     return r === "Legendary" ? false : counts[r] >= 3
   }
 
-  const mergeOnchain = async (rarity: WeaponRarity) => {
-    if (!WEAPON_CONTRACT_ADDRESS) return
-    const mod: any = await import("@farcaster/frame-sdk")
-    const provider = mod?.default?.wallet?.ethProvider ?? mod?.sdk?.wallet?.ethProvider ?? (window as any).ethereum
-    if (!provider) throw new Error("No wallet provider")
-
-    try {
-      await provider.request({ method: "eth_requestAccounts" })
-    } catch {}
-
-    const accounts = await provider.request({ method: "eth_accounts" })
-    const from = accounts?.[0]
-    if (!from) throw new Error("Wallet not connected")
-
-    // Pick a tokenId to merge for this rarity (any type)
-    const ids = weapons
-      .filter((w) => w.rarity === rarity)
-      .map((w) => Number(String(w.id).replace(/^onchain-/, "").split("-")[0]))
-      .filter((x) => Number.isFinite(x))
-
-    const countsById = new Map<number, number>()
-    for (const id of ids) countsById.set(id, (countsById.get(id) || 0) + 1)
-    const tokenIdNum = Array.from(countsById.entries()).find(([, c]) => c >= 3)?.[0]
-    if (!tokenIdNum) throw new Error("Need 3 of same weapon to merge")
-
-    const data = encodeFunctionData({
-      abi: WEAPON_ABI,
-      functionName: "merge",
-      args: [BigInt(tokenIdNum)],
-    })
-
-    await provider.request({
-      method: "eth_sendTransaction",
-      params: [
-        {
-          chainId: BASE_CHAIN_ID_HEX,
-          from,
-          to: WEAPON_CONTRACT_ADDRESS,
-          data,
-        },
-      ],
-    })
-
-    // refresh inventory
-    const res = await fetch(`/api/weapons/onchain?address=${from}`, { cache: "no-store" })
-    const json = await res.json()
-    const items = Array.isArray(json?.items) ? json.items : []
-    const list: Weapon[] = []
-    for (const it of items) {
-      const qty = Number(it?.balance || 0)
-      const w = it?.weapon as Weapon
-      if (w && qty > 0) {
-        for (let i = 0; i < qty; i++) list.push({ ...w, id: `${w.id}-${i}` })
-      }
-    }
-    setWeapons(list)
-  }
-
-  const mergeRarity = async (r: WeaponRarity) => {
+  const mergeRarity = async (r: Exclude<ItemRarity, "Set">) => {
     if (!canMergeRarity(r)) return
     setLoading(true)
     try {
-      // Supabase merge (wallet): best-effort local merge, then re-save list
+      // Supabase merge (wallet): best-effort local merge, then re-save
       try {
         const wallet = await getWalletAddress()
         if (wallet) {
-          const list = await loadWeapons(wallet)
-          const target = nextWeaponRarity(r)
-          const nextList: Weapon[] = []
+          const list = await loadItems(wallet)
+          const target = nextItemRarity(r)
+          const nextList: Item[] = []
           let removed = 0
-          for (const w of list) {
-            if (w.rarity === r && removed < 3) {
+          for (const it of list) {
+            if (it.rarity === r && removed < 3) {
               removed++
               continue
             }
-            nextList.push(w)
+            nextList.push(it)
           }
-          let nw = generateWeapon()
-          for (let i = 0; i < 50 && nw.rarity !== target; i++) nw = generateWeapon()
-          if (nw.rarity !== target) nw = { ...nw, rarity: target }
-          const row: any = await saveWeapon(nw, wallet)
-          const refreshed = await loadWeapons(wallet)
-          setWeapons(refreshed)
-          setLastForged({
-            ...nw,
-            id: row?.id ?? nw.id,
-          })
+
+          let ni = generateItem()
+          for (let i = 0; i < 80 && ni.rarity !== target; i++) ni = generateItem()
+          if (ni.rarity !== target) ni = { ...ni, rarity: target }
+
+          const row: any = await saveItem(ni, wallet)
+          const refreshed = await loadItems(wallet)
+          setItems(refreshed)
+          setLastForged({ ...ni, id: row?.id ?? ni.id })
           return
         }
       } catch {
@@ -258,35 +163,35 @@ export default function WeaponsPage() {
 
       // Fallback: server (fid)
       if (fid) {
-        const res = await fetch('/api/weapons/merge', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
+        const res = await fetch("/api/weapons/merge", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
           body: JSON.stringify({ fid, rarity: r }),
         })
         const json = await res.json()
-        const w = json?.item?.weapon as Weapon
-        if (w) setLastForged(w)
+        const it = json?.item?.item as Item
+        if (it) setLastForged(it)
         await refreshServer(fid)
         return
       }
 
       // fallback local merge
-      const target = nextWeaponRarity(r)
-      const nextList: Weapon[] = []
+      const target = nextItemRarity(r)
+      const nextList: Item[] = []
       let removed = 0
-      for (const w of weapons) {
-        if (w.rarity === r && removed < 3) {
+      for (const it of items) {
+        if (it.rarity === r && removed < 3) {
           removed++
           continue
         }
-        nextList.push(w)
+        nextList.push(it)
       }
-      let nw = generateWeapon()
-      for (let i = 0; i < 50 && nw.rarity !== target; i++) nw = generateWeapon()
-      if (nw.rarity !== target) nw = { ...nw, rarity: target }
-      const next = [nw, ...nextList]
+      let ni = generateItem()
+      for (let i = 0; i < 80 && ni.rarity !== target; i++) ni = generateItem()
+      if (ni.rarity !== target) ni = { ...ni, rarity: target }
+      const next = [ni, ...nextList]
       saveLocal(next)
-      setLastForged(nw)
+      setLastForged(ni)
     } finally {
       setLoading(false)
     }
@@ -294,95 +199,21 @@ export default function WeaponsPage() {
 
   return (
     <div className="px-4 pb-24">
-      <h1 className="text-2xl font-extrabold text-center mt-6">⚔️ Weapons</h1>
-      <p className="text-center text-gray-400 mt-2 text-sm">Forge & merge weapons</p>
-
-      {!WEAPON_CONTRACT_ADDRESS && (
-        <p className="text-center text-xs text-red-400 mt-2">
-          Missing NEXT_PUBLIC_WEAPON_CONTRACT_ADDRESS
-        </p>
-      )}
+      <h1 className="text-2xl font-extrabold text-center mt-6">🎒 Items</h1>
+      <p className="text-center text-gray-400 mt-2 text-sm">Forge & merge gear • Set items are 1%</p>
 
       <div className="mt-6 flex flex-col items-center gap-3">
-        {WEAPON_CONTRACT_ADDRESS && (
-          <button
-            onClick={async () => {
-              if (!WEAPON_CONTRACT_ADDRESS) return
-              setMinting(true)
-              try {
-                const mod: any = await import("@farcaster/frame-sdk")
-                const provider =
-                  mod?.default?.wallet?.ethProvider ?? mod?.sdk?.wallet?.ethProvider ?? (window as any).ethereum
-                if (!provider) throw new Error("No wallet provider")
+        <button
+          onClick={() => handleForge().catch(() => {})}
+          disabled={loading}
+          className="bg-yellow-500 hover:bg-yellow-400 disabled:opacity-50 text-black font-extrabold py-3 px-6 rounded-2xl"
+        >
+          {loading ? "Forging…" : "Forge Item"}
+        </button>
 
-                const tokenId = BigInt(Math.floor(Math.random() * 5) + 1)
-                const data = encodeFunctionData({
-                  abi: WEAPON_ABI,
-                  functionName: "mint",
-                  args: [tokenId, 1n],
-                })
-
-                try {
-                  await provider.request({ method: "eth_requestAccounts" })
-                } catch {}
-
-                const accounts = await provider.request({ method: "eth_accounts" })
-                const from = accounts?.[0]
-                if (!from) throw new Error("Wallet not connected")
-
-                const txHash = (await provider.request({
-                  method: "eth_sendTransaction",
-                  params: [
-                    {
-                      chainId: BASE_CHAIN_ID_HEX,
-                      from,
-                      to: WEAPON_CONTRACT_ADDRESS,
-                      data,
-                      value: WEAPON_MINT_PRICE_WEI_HEX,
-                    },
-                  ],
-                })) as string
-
-                // refresh onchain inventory (poll a bit; tx may not be mined yet)
-                try {
-                  for (let attempt = 0; attempt < 8; attempt++) {
-                    const res = await fetch(`/api/weapons/onchain?address=${from}`, { cache: "no-store" })
-                    const json = await res.json()
-                    const items = Array.isArray(json?.items) ? json.items : []
-                    const list: Weapon[] = []
-                    let total = 0
-                    for (const it of items) {
-                      const qty = Number(it?.balance || 0)
-                      total += qty
-                      const w = it?.weapon as Weapon
-                      if (w && qty > 0) {
-                        for (let i = 0; i < qty; i++) list.push({ ...w, id: `${w.id}-${i}` })
-                      }
-                    }
-                    if (total > weapons.length) {
-                      setWeapons(list)
-                      if (items?.[0]?.weapon) setLastForged(items[0].weapon as Weapon)
-                      break
-                    }
-                    await new Promise((r) => setTimeout(r, 1200))
-                  }
-                } catch {}
-
-                try {
-                  alert(`Mint sent! Tx: ${txHash}`)
-                } catch {}
-              } finally {
-                setMinting(false)
-              }
-            }}
-            disabled={minting}
-            className="bg-yellow-500 hover:bg-yellow-400 disabled:opacity-50 text-black font-extrabold py-3 px-6 rounded-2xl"
-          >
-            {minting ? "Minting…" : "⛓ Mint Weapon NFT (~$0.15)"}
-          </button>
-        )}
-
-        {/* forge button removed */}
+        <div className="text-[11px] text-gray-500 text-center max-w-sm">
+          Drop rates: Common 55% • Rare 28% • Epic 14% • Legendary 2% • <span className="text-[#f97316] font-bold">Set 1%</span>
+        </div>
       </div>
 
       {lastForged && (
@@ -390,7 +221,8 @@ export default function WeaponsPage() {
           <div className="text-5xl text-center">{lastForged.imageEmoji}</div>
           <p className="text-center font-extrabold mt-2">{lastForged.name}</p>
           <p className="text-center text-xs text-gray-400 mt-1">
-            {lastForged.rarity} {lastForged.type}
+            {lastForged.rarity} • {lastForged.slot.toUpperCase()}
+            {lastForged.set ? <span className="text-[#f97316]"> • {lastForged.set} Set</span> : null}
           </p>
           <p className="text-center text-xs mt-2">
             +{lastForged.bonusATK} ATK • +{lastForged.bonusDEF} DEF • +{lastForged.bonusSPD} SPD
@@ -399,41 +231,44 @@ export default function WeaponsPage() {
       )}
 
       <div className="mt-8 grid grid-cols-2 gap-3">
-        {(["Common", "Rare", "Epic", "Legendary"] as WeaponRarity[]).map((r) => (
+        {(["Common", "Rare", "Epic", "Legendary"] as Exclude<ItemRarity, "Set">[]).map((r) => (
           <div key={r} className="border border-gray-800 rounded-2xl p-3 bg-gray-900">
             <p className="font-bold text-sm">{r}</p>
             <p className="text-xs text-gray-400 mt-1">Count: {counts[r]}</p>
             {r !== "Legendary" && (
               <button
-                onClick={() => {
-                  if (wallet) mergeOnchain(r).catch((e) => alert(e?.message || String(e)))
-                  else mergeRarity(r)
-                }}
+                onClick={() => mergeRarity(r).catch(() => {})}
                 disabled={!canMergeRarity(r)}
                 className="mt-2 w-full bg-yellow-600 hover:bg-yellow-500 disabled:opacity-40 text-white text-xs py-2 rounded-xl"
               >
-                Merge 3 → {nextWeaponRarity(r)}
+                Merge 3 → {nextItemRarity(r)}
               </button>
             )}
           </div>
         ))}
+        <div className="border border-gray-800 rounded-2xl p-3 bg-gray-900">
+          <p className="font-bold text-sm text-[#f97316]">Set</p>
+          <p className="text-xs text-gray-400 mt-1">Count: {counts.Set}</p>
+          <p className="text-[10px] text-gray-500 mt-2">Set items can’t be merged.</p>
+        </div>
       </div>
 
       <h2 className="text-lg font-bold mt-10">Inventory</h2>
-      {weapons.length === 0 ? (
-        <p className="text-center text-gray-500 text-sm mt-3">No weapons yet.</p>
+      {items.length === 0 ? (
+        <p className="text-center text-gray-500 text-sm mt-3">No items yet.</p>
       ) : (
         <div className="grid grid-cols-2 gap-3 mt-4">
-          {weapons.map((w) => (
-            <div key={w.id} className={`border-2 rounded-xl p-3 bg-gray-900 ${rarityBorder[w.rarity]}`}>
-              <div className="text-3xl">{w.imageEmoji}</div>
-              <p className="font-bold text-sm mt-1 leading-tight">{w.name}</p>
+          {items.map((it) => (
+            <div key={it.id} className={`border-2 rounded-xl p-3 bg-gray-900 ${rarityBorder[it.rarity]}`}>
+              <div className="text-3xl">{it.imageEmoji}</div>
+              <p className="font-bold text-sm mt-1 leading-tight">{it.name}</p>
               <p className="text-xs text-gray-400">
-                {w.rarity} {w.type}
+                {it.rarity} • {it.slot.toUpperCase()}
+                {it.set ? <span className="text-[#f97316]"> • {it.set}</span> : null}
               </p>
-              <p className="text-xs mt-1">+{w.bonusATK} ATK</p>
-              <p className="text-xs">+{w.bonusDEF} DEF</p>
-              <p className="text-xs">+{w.bonusSPD} SPD</p>
+              <p className="text-xs mt-1">+{it.bonusATK} ATK</p>
+              <p className="text-xs">+{it.bonusDEF} DEF</p>
+              <p className="text-xs">+{it.bonusSPD} SPD</p>
             </div>
           ))}
         </div>

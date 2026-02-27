@@ -20,17 +20,19 @@ create table if not exists public.score_events (
 
 create index if not exists score_events_fid_created_idx on public.score_events (fid, created_at desc);
 
--- Weapons inventory (server-side persistence; later can be replaced by onchain NFTs)
-create table if not exists public.player_weapons (
+-- Items inventory (server-side persistence)
+create table if not exists public.player_items (
   id bigserial primary key,
   fid bigint not null,
-  weapon jsonb not null,
+  item jsonb not null,
   merged_from bigint[],
   created_at timestamptz not null default now()
 );
 
-create index if not exists player_weapons_fid_created_idx on public.player_weapons (fid, created_at desc);
-create index if not exists player_weapons_rarity_idx on public.player_weapons ((weapon->>'rarity'));
+create index if not exists player_items_fid_created_idx on public.player_items (fid, created_at desc);
+create index if not exists player_items_rarity_idx on public.player_items ((item->>'rarity'));
+create index if not exists player_items_slot_idx on public.player_items ((item->>'slot'));
+create index if not exists player_items_set_idx on public.player_items ((item->>'set'));
 
 -- PvP (live, realtime)
 create table if not exists public.pvp_matches (

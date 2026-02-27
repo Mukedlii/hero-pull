@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin'
-import { generateWeapon } from '@/lib/weapons'
+import { generateItem } from '@/lib/items'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -17,13 +17,13 @@ export async function POST(req: NextRequest) {
   if (!Number.isFinite(fid) || fid <= 0) return NextResponse.json({ error: 'invalid fid' }, { status: 400 })
 
   // NOTE: prototype forge is free (no onchain). We only persist to Supabase.
-  const weapon = generateWeapon()
+  const item = generateItem()
 
   const supabase = getSupabaseAdmin()
   const { data, error } = await supabase
-    .from('player_weapons')
-    .insert({ fid, weapon })
-    .select('id, fid, weapon, created_at')
+    .from('player_items')
+    .insert({ fid, item })
+    .select('id, fid, item, created_at')
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

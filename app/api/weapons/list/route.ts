@@ -11,8 +11,8 @@ export async function GET(req: NextRequest) {
 
   const supabase = getSupabaseAdmin()
   const { data, error } = await supabase
-    .from('player_weapons')
-    .select('id, fid, weapon, created_at')
+    .from('player_items')
+    .select('id, fid, item, created_at')
     .eq('fid', fid)
     .order('created_at', { ascending: false })
 

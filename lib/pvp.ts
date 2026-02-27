@@ -1,3 +1,5 @@
+import { getEquippedBonuses, getSetBonus, type EquippedItems } from "@/lib/items"
+
 export type PvPRole = "p1" | "p2"
 
 export type PvPHero = {
@@ -9,6 +11,7 @@ export type PvPHero = {
   defense: number
   speed: number
   imageUrl: string
+  equippedItems?: EquippedItems
 }
 
 export type PvPState = {
@@ -28,16 +31,27 @@ function clamp(n: number, a: number, b: number) {
   return Math.max(a, Math.min(b, n))
 }
 
+function effectiveStats(h: PvPHero) {
+  const itemBonus = getEquippedBonuses(h.equippedItems)
+  const setBonus = getSetBonus(h.equippedItems)
+  return {
+    atk: h.attack + itemBonus.atk + setBonus.atk,
+    def: h.defense + itemBonus.def + setBonus.def,
+    spd: h.speed + itemBonus.spd + setBonus.spd,
+  }
+}
+
 export function baseHp(h: PvPHero) {
-  // simple: scales with level + defense
-  const hp = 80 + Math.floor(h.level * 6) + Math.floor(h.defense * 1.2)
+  // simple: scales with level + defense (including items)
+  const eff = effectiveStats(h)
+  const hp = 80 + Math.floor(h.level * 6) + Math.floor(eff.def * 1.2)
   return clamp(hp, 70, 260)
 }
 
 export function startState(p1Hero: PvPHero, p2Hero: PvPHero, nowMs: number, turnMs: number): PvPState {
   const p1hp = baseHp(p1Hero)
   const p2hp = baseHp(p2Hero)
-  const first: PvPRole = p1Hero.speed >= p2Hero.speed ? "p1" : "p2"
+  const first: PvPRole = effectiveStats(p1Hero).spd >= effectiveStats(p2Hero).spd ? "p1" : "p2"
   return {
     turn: first,
     turnEndsAt: nowMs + turnMs,
@@ -85,8 +99,10 @@ export function applyMove(
     }
   } else {
     // attack
-    const raw = Math.floor(selfHero.attack * (0.8 + (next.turnIndex % 3) * 0.05))
-    const mitigated = Math.floor(oppHero.defense * 0.35)
+    const selfEff = effectiveStats(selfHero)
+    const oppEff = effectiveStats(oppHero)
+    const raw = Math.floor(selfEff.atk * (0.8 + (next.turnIndex % 3) * 0.05))
+    const mitigated = Math.floor(oppEff.def * 0.35)
     const dmg = clamp(Math.floor((raw - mitigated) * oppDefMult), 1, 999)
     opp.hp = clamp(opp.hp - dmg, 0, opp.maxHp)
     next.log.push(`${mover.toUpperCase()} attacks -${dmg}`)

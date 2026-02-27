@@ -1,5 +1,5 @@
-import type { Hero, EquippedWeapon } from "./heroes"
-import type { Weapon } from "./weapons"
+import type { Hero } from "./heroes"
+import type { Item } from "./items"
 import { supabase } from "./supabase"
 
 type RequestArgs = { method: string; params?: any[] }
@@ -55,7 +55,7 @@ export async function saveHero(hero: Hero, walletAddress: string) {
       xp: hero.xp || 0,
       level: hero.level || 1,
       image_url: hero.imageUrl,
-      equipped_weapon: hero.equippedWeapon ?? null,
+      equipped_items: hero.equippedItems ?? null,
     })
     .select()
     .single()
@@ -85,28 +85,29 @@ export async function loadHeroes(walletAddress: string): Promise<Hero[]> {
     xp: h.xp,
     level: h.level,
     imageUrl: h.image_url,
-    equippedWeapon: (h.equipped_weapon as EquippedWeapon) ?? undefined,
+    equippedItems: (h.equipped_items as any) ?? undefined,
     dbId: h.id,
   }))
 }
 
-export async function updateHeroEquippedWeapon(heroId: string, equippedWeapon: EquippedWeapon | null) {
-  const { error } = await supabase().from("heroes").update({ equipped_weapon: equippedWeapon }).eq("id", heroId)
+export async function updateHeroEquippedItems(heroId: string, equippedItems: Hero["equippedItems"] | null) {
+  const { error } = await supabase().from("heroes").update({ equipped_items: equippedItems }).eq("id", heroId)
   if (error) throw error
 }
 
-export async function saveWeapon(weapon: Weapon, walletAddress: string) {
+export async function saveItem(item: Item, walletAddress: string) {
   const { data, error } = await supabase()
-    .from("weapons")
+    .from("items")
     .insert({
       wallet_address: walletAddress,
-      name: weapon.name,
-      type: weapon.type,
-      rarity: weapon.rarity,
-      bonus_atk: weapon.bonusATK,
-      bonus_def: weapon.bonusDEF,
-      bonus_spd: weapon.bonusSPD,
-      image_emoji: weapon.imageEmoji,
+      name: item.name,
+      slot: item.slot,
+      rarity: item.rarity,
+      bonus_atk: item.bonusATK,
+      bonus_def: item.bonusDEF,
+      bonus_spd: item.bonusSPD,
+      image_emoji: item.imageEmoji,
+      set_name: item.set ?? null,
     })
     .select()
     .single()
@@ -115,9 +116,9 @@ export async function saveWeapon(weapon: Weapon, walletAddress: string) {
   return data
 }
 
-export async function loadWeapons(walletAddress: string): Promise<Weapon[]> {
+export async function loadItems(walletAddress: string): Promise<Item[]> {
   const { data, error } = await supabase()
-    .from("weapons")
+    .from("items")
     .select("*")
     .eq("wallet_address", walletAddress)
     .order("created_at", { ascending: false })
@@ -125,20 +126,21 @@ export async function loadWeapons(walletAddress: string): Promise<Weapon[]> {
   if (error) throw error
   if (!data) return []
 
-  return data.map((w: any) => ({
-    id: w.id,
-    name: w.name,
-    type: w.type,
-    rarity: w.rarity,
-    bonusATK: w.bonus_atk,
-    bonusDEF: w.bonus_def,
-    bonusSPD: w.bonus_spd,
-    imageEmoji: w.image_emoji,
+  return data.map((row: any) => ({
+    id: row.id,
+    name: row.name,
+    slot: row.slot,
+    rarity: row.rarity,
+    bonusATK: row.bonus_atk,
+    bonusDEF: row.bonus_def,
+    bonusSPD: row.bonus_spd,
+    imageEmoji: row.image_emoji,
+    set: row.set_name ?? undefined,
   }))
 }
 
-export async function markWeaponEquipped(weaponId: string, heroId: string | null) {
-  const { error } = await supabase().from("weapons").update({ equipped_to_hero_id: heroId }).eq("id", weaponId)
+export async function markItemEquipped(itemId: string, heroId: string | null) {
+  const { error } = await supabase().from("items").update({ equipped_to_hero_id: heroId }).eq("id", itemId)
   if (error) throw error
 }
 

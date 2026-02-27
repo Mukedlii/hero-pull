@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { Hero } from '@/lib/heroes'
+import { getEquippedBonuses, getSetBonus } from "@/lib/items"
 
 interface Props {
   hero: Hero
@@ -23,21 +24,40 @@ export default function BattleArena({ hero, opponent, winner, battleId, onBattle
   }
 
   const heroEff = useMemo(() => {
-    const w = hero.equippedWeapon
+    const itemBonus = getEquippedBonuses(hero.equippedItems)
+    const setBonus = getSetBonus(hero.equippedItems)
+
     return {
-      atk: hero.attack + (w?.bonusATK || 0),
-      def: hero.defense + (w?.bonusDEF || 0),
-      spd: hero.speed + (w?.bonusSPD || 0),
+      base: { atk: hero.attack, def: hero.defense, spd: hero.speed },
+      itemBonus,
+      setBonus,
+      total: {
+        atk: hero.attack + itemBonus.atk + setBonus.atk,
+        def: hero.defense + itemBonus.def + setBonus.def,
+        spd: hero.speed + itemBonus.spd + setBonus.spd,
+      },
     }
   }, [hero])
 
   const oppEff = useMemo(() => {
-    return { atk: opponent.attack, def: opponent.defense, spd: opponent.speed }
+    const itemBonus = getEquippedBonuses(opponent.equippedItems)
+    const setBonus = getSetBonus(opponent.equippedItems)
+
+    return {
+      base: { atk: opponent.attack, def: opponent.defense, spd: opponent.speed },
+      itemBonus,
+      setBonus,
+      total: {
+        atk: opponent.attack + itemBonus.atk + setBonus.atk,
+        def: opponent.defense + itemBonus.def + setBonus.def,
+        spd: opponent.speed + itemBonus.spd + setBonus.spd,
+      },
+    }
   }, [opponent])
 
   const plannedWinner: Side = useMemo(() => {
-    const heroScore = heroEff.atk + heroEff.def + heroEff.spd
-    const oppScore = oppEff.atk + oppEff.def + oppEff.spd
+    const heroScore = heroEff.total.atk + heroEff.total.def + heroEff.total.spd
+    const oppScore = oppEff.total.atk + oppEff.total.def + oppEff.total.spd
     return heroScore >= oppScore ? 'hero' : 'opponent'
   }, [heroEff, oppEff])
 
@@ -63,13 +83,20 @@ export default function BattleArena({ hero, opponent, winner, battleId, onBattle
     setHeroHp(100)
     setOppHp(100)
     setActiveHit(null)
-    setLog([`Battle started!`, hero.equippedWeapon ? `Equipped: ${hero.equippedWeapon.name}` : `No weapon equipped`])
+    setLog([
+      `Battle started!`,
+      heroEff.setBonus.setName
+        ? `Equipped: FULL SET (${heroEff.setBonus.setName})`
+        : hero.equippedItems && Object.keys(hero.equippedItems).length
+          ? `Equipped: ${Object.values(hero.equippedItems).filter(Boolean).length} items`
+          : `No items equipped`,
+    ])
 
     const heroBias = plannedWinner === 'hero' ? 1 : -1
     const oppBias = plannedWinner === 'opponent' ? 1 : -1
 
-    const heroBase = Math.max(6, Math.floor(heroEff.atk * 0.65 - oppEff.def * 0.25 + heroEff.spd * 0.1))
-    const oppBase = Math.max(6, Math.floor(oppEff.atk * 0.65 - heroEff.def * 0.25 + oppEff.spd * 0.1))
+    const heroBase = Math.max(6, Math.floor(heroEff.total.atk * 0.65 - oppEff.total.def * 0.25 + heroEff.total.spd * 0.1))
+    const oppBase = Math.max(6, Math.floor(oppEff.total.atk * 0.65 - heroEff.total.def * 0.25 + oppEff.total.spd * 0.1))
 
     const heroDmg = [
       Math.max(4, heroBase + 4 * heroBias),
@@ -132,27 +159,64 @@ export default function BattleArena({ hero, opponent, winner, battleId, onBattle
       <div
         className={`relative w-[170px] p-3 rounded-2xl border-2 bg-gray-950/60 ${rarityBorder[h.rarity]} ${
           winner === side ? 'ring-2 ring-yellow-300' : ''
-        } ${hit ? 'battle-hit' : ''}`}
+        } ${hit ? 'battle-hit' : ''} ${eff.setBonus.setName ? 'border-[#f97316] shadow-[0_0_22px_#f97316]' : ''}`}
       >
         <div className="text-xs text-gray-400">{side === 'hero' ? 'You' : 'Enemy'}</div>
         <div className="text-sm font-extrabold truncate">{h.name}</div>
+
+        {eff.setBonus.setName && (
+          <div className="mt-1 inline-flex items-center gap-1 text-[10px] font-extrabold text-[#f97316] border border-[#f97316]/60 bg-[#f97316]/10 px-2 py-0.5 rounded-full">
+            🔥 FULL SET BONUS • {eff.setBonus.setName}
+          </div>
+        )}
 
         <div className="mt-2 flex items-center gap-3">
           <div className={`w-14 h-14 rounded-xl overflow-hidden border ${rarityBorder[h.rarity]}`}>
             <img src={h.imageUrl} alt={h.name} className="w-full h-full object-cover" />
           </div>
           <div className="flex-1">
-            <div className="text-[11px] text-gray-300">ATK {eff.atk}</div>
-            <div className="text-[11px] text-gray-300">DEF {eff.def}</div>
-            <div className="text-[11px] text-gray-300">SPD {eff.spd}</div>
+            <div className="text-[11px] text-gray-300">
+              ATK {eff.base.atk}{" "}
+              {(eff.itemBonus.atk > 0 || eff.setBonus.atk > 0) && (
+                <>
+                  <span className="text-green-400">[+{eff.itemBonus.atk}]</span>
+                  {eff.setBonus.atk > 0 && <span className="text-[#f97316]">[+{eff.setBonus.atk}]</span>}
+                </>
+              )}
+            </div>
+            <div className="text-[11px] text-gray-300">
+              DEF {eff.base.def}{" "}
+              {(eff.itemBonus.def > 0 || eff.setBonus.def > 0) && (
+                <>
+                  <span className="text-green-400">[+{eff.itemBonus.def}]</span>
+                  {eff.setBonus.def > 0 && <span className="text-[#f97316]">[+{eff.setBonus.def}]</span>}
+                </>
+              )}
+            </div>
+            <div className="text-[11px] text-gray-300">
+              SPD {eff.base.spd}{" "}
+              {(eff.itemBonus.spd > 0 || eff.setBonus.spd > 0) && (
+                <>
+                  <span className="text-green-400">[+{eff.itemBonus.spd}]</span>
+                  {eff.setBonus.spd > 0 && <span className="text-[#f97316]">[+{eff.setBonus.spd}]</span>}
+                </>
+              )}
+            </div>
           </div>
         </div>
 
         <div className="mt-2">{hpBar(hp)}</div>
 
-        {side === 'hero' && hero.equippedWeapon && (
-          <div className="mt-2 text-[11px] text-cyan-200">
-            ⚔️ {hero.equippedWeapon.imageEmoji} {hero.equippedWeapon.name} (+{hero.equippedWeapon.bonusATK} ATK)
+        {side === 'hero' && hero.equippedItems && Object.values(hero.equippedItems).some(Boolean) && (
+          <div className="mt-2 text-[10px] text-cyan-200 space-y-0.5">
+            {Object.entries(hero.equippedItems)
+              .filter(([, v]) => !!v)
+              .map(([slot, it]: any) => (
+                <div key={slot}>
+                  • {String(slot).toUpperCase()}: {it.imageEmoji} {it.name}
+                  {it.set ? <span className="text-[#f97316]"> ({it.set})</span> : null}
+                </div>
+              ))}
           </div>
         )}
       </div>

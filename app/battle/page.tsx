@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import BattleArena from "@/components/BattleArena"
 import { generateHero, type Hero } from "@/lib/heroes"
+import { getEquippedBonuses, getSetBonus } from "@/lib/items"
 import { awardBattlePoints } from "@/lib/score"
 
 export default function BattlePage() {
@@ -31,9 +32,11 @@ export default function BattlePage() {
     setWinner(null)
 
     setTimeout(() => {
-      const heroEffectiveATK = hero.attack + (hero.equippedWeapon?.bonusATK || 0)
-      const heroEffectiveDEF = hero.defense + (hero.equippedWeapon?.bonusDEF || 0)
-      const heroEffectiveSPD = hero.speed + (hero.equippedWeapon?.bonusSPD || 0)
+      const itemBonus = getEquippedBonuses(hero.equippedItems)
+      const setBonus = getSetBonus(hero.equippedItems)
+      const heroEffectiveATK = hero.attack + itemBonus.atk + setBonus.atk
+      const heroEffectiveDEF = hero.defense + itemBonus.def + setBonus.def
+      const heroEffectiveSPD = hero.speed + itemBonus.spd + setBonus.spd
       const heroScore = heroEffectiveATK + heroEffectiveDEF + heroEffectiveSPD
 
       const oppScore = o.attack + o.defense + o.speed
@@ -117,9 +120,9 @@ export default function BattlePage() {
       <h1 className="text-2xl font-extrabold text-center mt-6">Battle</h1>
       <p className="text-center text-gray-400 mt-2 text-sm">Fight a random opponent!</p>
 
-      {hero.equippedWeapon && (
+      {hero.equippedItems && Object.values(hero.equippedItems).some(Boolean) && (
         <div className="mt-4 text-center text-xs text-gray-300">
-          ⚔️ {hero.equippedWeapon.imageEmoji} {hero.equippedWeapon.name} (+{hero.equippedWeapon.bonusATK} ATK)
+          Equipped: {Object.values(hero.equippedItems).filter(Boolean).length} items
         </div>
       )}
 

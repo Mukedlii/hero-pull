@@ -1,11 +1,4 @@
-export type EquippedWeapon = {
-  name: string
-  rarity: 'Common' | 'Rare' | 'Epic' | 'Legendary'
-  imageEmoji: string
-  bonusATK: number
-  bonusDEF: number
-  bonusSPD: number
-}
+import type { EquippedItems } from "@/lib/items"
 
 export type Hero = {
   name: string
@@ -18,7 +11,8 @@ export type Hero = {
   speed: number
   xp: number
   level: number
-  equippedWeapon?: EquippedWeapon
+  /** Four gear slots: weapon/shield/boots/helmet */
+  equippedItems?: EquippedItems
   dbId?: string
 }
 
@@ -120,10 +114,10 @@ export function generateRarity(): Hero['rarity'] {
 
 function generateStatForRarity(rarity: Hero['rarity']): number {
   const ranges: Record<Hero['rarity'], [number, number]> = {
-    Common: [10, 40],
-    Rare: [30, 60],
-    Epic: [50, 80],
-    Legendary: [70, 100],
+    Common: [10, 250],
+    Rare: [200, 450],
+    Epic: [400, 700],
+    Legendary: [650, 999],
   }
   const [min, max] = ranges[rarity]
   return Math.floor(Math.random() * (max - min + 1)) + min
