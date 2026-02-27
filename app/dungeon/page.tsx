@@ -1,943 +1,394 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
-import frameSdk from "@farcaster/frame-sdk"
+import { useEffect, useMemo, useState } from "react"
 import type { Hero } from "@/lib/heroes"
-import type { EquippedItems, Item, ItemRarity, ItemSlot } from "@/lib/items"
-import { FULL_SET_BONUS, generateItem, getEquippedBonuses, getSetBonus } from "@/lib/items"
+import { getEquippedBonuses, getSetBonus } from "@/lib/items"
 import { addItemToInventory } from "@/lib/inventory"
-import { getWalletAddress, loadStats, saveStats } from "@/lib/db"
 import { loadGold, saveGold } from "@/lib/gold"
+import { awardBattlePoints } from "@/lib/score"
+import { DUNGEON_LEVELS, getLevelConfig, randInt, roomTypeForFloor, type DungeonRoomType } from "@/lib/dungeonConfig"
+import { DEFAULT_DUNGEON_PROGRESS, loadDungeonProgress, saveDungeonProgress, type DungeonProgress } from "@/lib/dungeonProgress"
+import { generateItem } from "@/lib/items"
 
-type RoomType = "battle" | "treasure" | "shop" | "trap" | "blessing" | "boss"
-
-type PotionType = "healing" | "mana" | "elixir"
-
-type PotionCounts = Record<PotionType, number>
-
-type BattleSide = {
-  name: string
-  hp: number
-  maxHp: number
-  atk: number
-  def: number
-  spd: number
-}
-
-type EnemyTemplate = {
-  name: string
-  emoji: string
-  hp: number
-  atk: number
-  def: number
-  spd: number
+type RunState = {
+  runId: string
+  level: number
+  floor: number
+  roomType: DungeonRoomType
   score: number
-  gold: number
-}
-
-type Enemy = EnemyTemplate & { hp: number; maxHp: number }
-
-const CURRENT_HERO_KEY = "hero-pull-current-hero"
-const EQUIP_MAP_KEY = "hero-pull-equipped-items" // { [tokenId]: EquippedItems }
-const POTIONS_KEY = "hero-pull-potions" // PotionCounts
-const POINTS_KEY = "hero-pull-points"
-
-const DUNGEON_TREASURY = "0xa782922Ff9c54F4264FD049189eC66940f528Eb0" // matches legacy dungeon HTML
-const BASE_CHAIN_ID_HEX = "0x2105" // 8453
-
-function clampInt(n: number, min: number, max: number) {
-  const x = Math.floor(Number(n) || 0)
-  return Math.max(min, Math.min(max, x))
-}
-
-function safeJsonParse<T>(raw: string | null, fallback: T): T {
-  if (!raw) return fallback
-  try {
-    return JSON.parse(raw) as T
-  } catch {
-    return fallback
+  goldGained: number
+  hero: {
+    hp: number
+    maxHp: number
+    potions: number
   }
-}
-
-function getProvider() {
-  return frameSdk?.wallet?.ethProvider ?? (typeof window !== "undefined" ? (window as any).ethereum : null)
-}
-
-async function providerRequest(args: { method: string; params?: any[] }) {
-  const p = getProvider()
-  if (!p) throw new Error("No wallet provider available")
-  return p.request(args)
-}
-
-async function sendTx0_0002Eth(label: string) {
-  const p = getProvider()
-  if (!p) throw new Error("No wallet provider found")
-
-  // connect best-effort
-  try {
-    await providerRequest({ method: "eth_requestAccounts" })
-  } catch {
-    // ignore
+  enemy?: {
+    name: string
+    hp: number
+    maxHp: number
+    atk: number
+    def: number
+    spd: number
+    isBoss: boolean
   }
-
-  let from: string | undefined
-  try {
-    const accounts = (await providerRequest({ method: "eth_accounts" })) as string[]
-    from = accounts?.[0]
-  } catch {
-    // ignore
-  }
-
-  const valueWeiHex = "0x" + BigInt("200000000000000").toString(16) // 0.0002
-  const hash = (await providerRequest({
-    method: "eth_sendTransaction",
-    params: [
-      {
-        chainId: BASE_CHAIN_ID_HEX,
-        from,
-        to: DUNGEON_TREASURY,
-        value: valueWeiHex,
-        data: "0x", // no-op
-      },
-    ],
-  })) as string
-
-  return { hash, label }
+  log: string[]
+  finished: boolean
+  victory?: boolean
 }
 
-function hpFromHeroStats(atk: number, def: number) {
-  // Scales with hero-pull stats (10..999). Keep runs survivable.
-  const v = 140 + Math.floor(def * 0.6) + Math.floor(atk * 0.2)
-  return clampInt(v, 120, 999)
+const RUN_KEY = "hero-pull-dungeon-run-v2"
+
+function clamp(n: number, a: number, b: number) {
+  return Math.max(a, Math.min(b, n))
 }
 
-function roomWeights(floor: number): Array<{ type: RoomType; w: number }> {
-  if (floor >= 10) return [{ type: "boss", w: 1 }]
-  // similar to legacy dungeon; battle-heavy
-  return [
-    { type: "battle", w: 50 },
-    { type: "treasure", w: 20 },
-    { type: "shop", w: 15 },
-    { type: "trap", w: 10 },
-    { type: "blessing", w: 5 },
-  ]
-}
-
-function pickWeighted<T extends string>(rows: Array<{ type: T; w: number }>): T {
-  const tot = rows.reduce((s, r) => s + r.w, 0)
-  let roll = Math.random() * tot
-  for (const r of rows) {
-    roll -= r.w
-    if (roll <= 0) return r.type
-  }
-  return rows[0]!.type
-}
-
-const ENEMIES: EnemyTemplate[] = [
-  { name: "Slime", emoji: "🟢", hp: 160, atk: 110, def: 60, spd: 90, score: 18, gold: 10 },
-  { name: "Bat", emoji: "🦇", hp: 130, atk: 140, def: 50, spd: 150, score: 20, gold: 12 },
-  { name: "Goblin", emoji: "👺", hp: 240, atk: 190, def: 110, spd: 110, score: 35, gold: 20 },
-  { name: "Skeleton", emoji: "💀", hp: 260, atk: 210, def: 130, spd: 100, score: 40, gold: 22 },
-  { name: "Orc Warrior", emoji: "👹", hp: 400, atk: 260, def: 190, spd: 95, score: 60, gold: 28 },
-  { name: "Dark Witch", emoji: "🧙", hp: 340, atk: 330, def: 140, spd: 130, score: 70, gold: 34 },
-  { name: "Stone Golem", emoji: "🗿", hp: 540, atk: 300, def: 300, spd: 70, score: 85, gold: 40 },
-  { name: "Shadow Drake", emoji: "🐲", hp: 480, atk: 360, def: 220, spd: 120, score: 95, gold: 46 },
-  { name: "DRAGON KING", emoji: "🐉", hp: 900, atk: 420, def: 260, spd: 140, score: 450, gold: 120 },
-]
-
-function enemyForFloor(floor: number, boss: boolean): Enemy {
-  if (boss) {
-    const b = ENEMIES[8]!
-    return { ...b, hp: b.hp, maxHp: b.hp }
-  }
-
-  let pool: EnemyTemplate[]
-  if (floor <= 3) pool = ENEMIES.slice(0, 2)
-  else if (floor <= 6) pool = ENEMIES.slice(2, 4)
-  else pool = ENEMIES.slice(4, 8)
-
-  const base = pool[Math.floor(Math.random() * pool.length)]!
-
-  // Scaling curve per floor.
-  const scale = 1 + (floor - 1) * 0.16
-  const hp = clampInt(base.hp * scale, 1, 9999)
-  const atk = clampInt(base.atk * scale, 1, 9999)
-  const def = clampInt(base.def * scale, 1, 9999)
-  const spd = clampInt(base.spd * (1 + (floor - 1) * 0.04), 1, 9999)
-
+function effectiveStats(hero: Hero) {
+  const itemBonus = getEquippedBonuses(hero.equippedItems)
+  const setBonus = getSetBonus(hero.equippedItems)
   return {
-    ...base,
-    hp,
-    maxHp: hp,
-    atk,
-    def,
-    spd,
+    atk: hero.attack + itemBonus.atk + setBonus.atk,
+    def: hero.defense + itemBonus.def + setBonus.def,
+    spd: hero.speed + itemBonus.spd + setBonus.spd,
+    setName: setBonus.setName,
   }
 }
 
-function rarityBorder(r: ItemRarity) {
-  if (r === "Common") return "border-gray-700"
-  if (r === "Rare") return "border-blue-500 shadow-[0_0_12px_#60a5fa]"
-  if (r === "Epic") return "border-purple-500 shadow-[0_0_15px_#c084fc]"
-  if (r === "Legendary") return "border-yellow-400 shadow-[0_0_20px_#ffd700]"
-  return "border-[#f97316] shadow-[0_0_22px_#f97316]"
+function baseHp(hero: Hero) {
+  const eff = effectiveStats(hero)
+  const hp = 90 + Math.floor(hero.level * 6) + Math.floor(eff.def * 1.1)
+  return clamp(hp, 80, 420)
 }
 
-function slotLabel(slot: ItemSlot) {
-  if (slot === "weapon") return "Weapon"
-  if (slot === "shield") return "Shield"
-  if (slot === "boots") return "Boots"
-  return "Helmet"
-}
-
-function floorDropRarity(floor: number): ItemRarity {
-  // Floor-based table (early: Common/Rare; late: Epic/Legendary; Set appears late)
-  const roll = Math.random() * 100
-  if (floor <= 2) {
-    if (roll < 70) return "Common"
-    if (roll < 95) return "Rare"
-    return "Epic"
+function loadCurrentHero(): Hero | null {
+  if (typeof window === "undefined") return null
+  try {
+    const raw = localStorage.getItem("hero-pull-current-hero")
+    return raw ? (JSON.parse(raw) as Hero) : null
+  } catch {
+    return null
   }
-  if (floor <= 4) {
-    if (roll < 50) return "Common"
-    if (roll < 85) return "Rare"
-    if (roll < 98) return "Epic"
-    return "Legendary"
-  }
-  if (floor <= 7) {
-    if (roll < 30) return "Common"
-    if (roll < 70) return "Rare"
-    if (roll < 92) return "Epic"
-    if (roll < 98) return "Legendary"
-    return "Set"
-  }
-  // 8-9
-  if (roll < 20) return "Common"
-  if (roll < 55) return "Rare"
-  if (roll < 80) return "Epic"
-  if (roll < 92) return "Legendary"
-  return "Set"
 }
 
-function desiredSetForFloor(floor: number): "Shadow" | "Dragon" {
-  // Shadow mid dungeon; Dragon late.
-  return floor >= 8 ? "Dragon" : "Shadow"
-}
-
-function generateFloorDrop(floor: number): Item {
-  const target = floorDropRarity(floor)
-
-  // generateItem already includes Set rarity with a random set; we bias it by floor.
-  if (target === "Set") {
-    const want = desiredSetForFloor(floor)
-    let it = generateItem()
-    for (let i = 0; i < 250 && !(it.rarity === "Set" && it.set === want); i++) it = generateItem()
-    if (it.rarity === "Set" && it.set === want) return it
-    // fallback: just whatever set item we got
-    return it
+function makeEnemy(level: number, isBoss: boolean) {
+  const cfg = getLevelConfig(level)
+  const r = isBoss ? cfg.boss : cfg.enemy
+  const name = isBoss ? cfg.boss.name : "Enemy"
+  return {
+    name,
+    hp: randInt(r.hp[0], r.hp[1]),
+    maxHp: randInt(r.hp[0], r.hp[1]),
+    atk: randInt(r.atk[0], r.atk[1]),
+    def: randInt(r.def[0], r.def[1]),
+    spd: randInt(r.spd[0], r.spd[1]),
+    isBoss,
   }
-
-  let it = generateItem()
-  for (let i = 0; i < 250 && it.rarity !== target; i++) it = generateItem()
-  if (it.rarity !== target) it = { ...it, rarity: target } // safety
-  return it
 }
 
-function capPotionsAtEntry(pots: PotionCounts, cap: number): PotionCounts {
-  const c: PotionCounts = { healing: clampInt(pots.healing, 0, 99), mana: clampInt(pots.mana, 0, 99), elixir: clampInt(pots.elixir, 0, 99) }
-  let total = c.healing + c.mana + c.elixir
-  if (total <= cap) return c
-
-  // reduce from the largest pile first
-  const order: PotionType[] = ["healing", "mana", "elixir"]
-  while (total > cap) {
-    const t = order.sort((a, b) => c[b] - c[a])[0]!
-    if (c[t] <= 0) break
-    c[t] -= 1
-    total -= 1
+function newRun(level: number, hero: Hero): RunState {
+  const runId = globalThis.crypto?.randomUUID?.() ?? String(Date.now())
+  const hp = baseHp(hero)
+  const floor = 1
+  const roomType = roomTypeForFloor(floor)
+  const st: RunState = {
+    runId,
+    level,
+    floor,
+    roomType,
+    score: 0,
+    goldGained: 0,
+    hero: { hp, maxHp: hp, potions: 1 },
+    log: ["Entered the dungeon"],
+    finished: false,
   }
-  return c
+  return st
 }
 
-function loadPotionCounts(): PotionCounts {
-  if (typeof window === "undefined") return { healing: 2, mana: 1, elixir: 0 }
-  const raw = localStorage.getItem(POTIONS_KEY)
-  const parsed = safeJsonParse<PotionCounts>(raw, { healing: 2, mana: 1, elixir: 0 })
-  const fixed: PotionCounts = {
-    healing: clampInt((parsed as any).healing ?? 0, 0, 99),
-    mana: clampInt((parsed as any).mana ?? 0, 0, 99),
-    elixir: clampInt((parsed as any).elixir ?? 0, 0, 99),
-  }
-  return fixed
-}
-
-function savePotionCounts(pots: PotionCounts) {
+function saveRunState(st: RunState | null) {
   if (typeof window === "undefined") return
   try {
-    localStorage.setItem(POTIONS_KEY, JSON.stringify(pots))
+    if (!st) localStorage.removeItem(RUN_KEY)
+    else localStorage.setItem(RUN_KEY, JSON.stringify(st))
   } catch {
     // ignore
   }
 }
 
-function readEquippedForHero(current: any): EquippedItems | undefined {
-  // 1) hero object may already have equippedItems
-  if (current?.equippedItems) return current.equippedItems as EquippedItems
-
-  // 2) onchain hero: equipped stored in EQUIP_MAP_KEY by tokenId
-  const tokenId = current?.tokenId ? String(current.tokenId) : null
-  if (!tokenId) return undefined
-  if (typeof window === "undefined") return undefined
-  const map = safeJsonParse<Record<string, EquippedItems | null>>(localStorage.getItem(EQUIP_MAP_KEY), {})
-  return map[tokenId] ?? undefined
-}
-
-function persistEquippedForHero(current: any, equipped: EquippedItems) {
-  if (typeof window === "undefined") return
-
-  // Update CURRENT_HERO_KEY object (best-effort)
+function loadRunState(): RunState | null {
+  if (typeof window === "undefined") return null
   try {
-    const next = { ...(current || {}), equippedItems: equipped }
-    localStorage.setItem(CURRENT_HERO_KEY, JSON.stringify(next))
+    const raw = localStorage.getItem(RUN_KEY)
+    return raw ? (JSON.parse(raw) as RunState) : null
   } catch {
-    // ignore
+    return null
   }
-
-  // If tokenId exists, also keep equip map up to date.
-  const tokenId = current?.tokenId ? String(current.tokenId) : null
-  if (tokenId) {
-    try {
-      const map = safeJsonParse<Record<string, EquippedItems | null>>(localStorage.getItem(EQUIP_MAP_KEY), {})
-      map[tokenId] = equipped
-      localStorage.setItem(EQUIP_MAP_KEY, JSON.stringify(map))
-    } catch {
-      // ignore
-    }
-  }
-}
-
-async function addPoints(delta: number) {
-  const d = clampInt(delta, 0, 1_000_000)
-  if (!d) return { added: 0, mode: "none" as const }
-
-  try {
-    const wallet = await getWalletAddress()
-    if (wallet) {
-      const cur = await loadStats(wallet)
-      const currentPoints = clampInt((cur as any)?.points ?? 0, 0, 1_000_000_000)
-      await saveStats(wallet, { points: currentPoints + d })
-      return { added: d, mode: "supabase" as const }
-    }
-  } catch {
-    // ignore
-  }
-
-  if (typeof window !== "undefined") {
-    const cur = clampInt(Number(localStorage.getItem(POINTS_KEY) || "0"), 0, 1_000_000_000)
-    localStorage.setItem(POINTS_KEY, String(cur + d))
-  }
-  return { added: d, mode: "local" as const }
-}
-
-function calcDamage(attackerAtk: number, defenderDef: number, critChance: number, critMult: number) {
-  const roll = 0.85 + Math.random() * 0.3
-  let dmg = Math.floor(attackerAtk * 0.12 * roll)
-  dmg -= Math.floor(defenderDef * 0.07)
-  dmg = Math.max(1, dmg)
-  const crit = Math.random() < critChance
-  if (crit) dmg = Math.floor(dmg * critMult)
-  return { dmg, crit }
-}
-
-function shareUrl(text: string) {
-  const frameUrl = "https://hero-pull.vercel.app"
-  return `https://warpcast.com/~/compose?text=${encodeURIComponent(text)}&embeds[]=${encodeURIComponent(frameUrl)}`
 }
 
 export default function DungeonPage() {
-  const [loading, setLoading] = useState(true)
-  const [heroRaw, setHeroRaw] = useState<any | null>(null)
   const [hero, setHero] = useState<Hero | null>(null)
-  const [equipped, setEquipped] = useState<EquippedItems>({})
-
-  const eff = useMemo(() => {
-    if (!hero) return null
-    const itemBonus = getEquippedBonuses(equipped)
-    const setBonus = getSetBonus(equipped)
-    return {
-      base: { atk: hero.attack, def: hero.defense, spd: hero.speed },
-      itemBonus,
-      setBonus,
-      total: {
-        atk: hero.attack + itemBonus.atk + setBonus.atk,
-        def: hero.defense + itemBonus.def + setBonus.def,
-        spd: hero.speed + itemBonus.spd + setBonus.spd,
-      },
-    }
-  }, [hero, equipped])
-
-  // Run state
-  const [started, setStarted] = useState(false)
-  const [floor, setFloor] = useState(1)
-  const [room, setRoom] = useState<RoomType>("battle")
-  const [runScore, setRunScore] = useState(0)
-  const [runGold, setRunGold] = useState(0)
-  const [mp, setMp] = useState(50)
-  const [pots, setPots] = useState<PotionCounts>({ healing: 2, mana: 1, elixir: 0 })
-
-  const [playerHp, setPlayerHp] = useState(0)
-  const [playerMaxHp, setPlayerMaxHp] = useState(0)
-
-  const [enemy, setEnemy] = useState<Enemy | null>(null)
-  const [inBattle, setInBattle] = useState(false)
-  const [playerTurn, setPlayerTurn] = useState(true)
-  const [defending, setDefending] = useState(false)
-  const [log, setLog] = useState<string[]>([])
-  const [loot, setLoot] = useState<Item | null>(null)
-
-  const [shopItems, setShopItems] = useState<Item[]>([])
+  const [progress, setProgress] = useState<DungeonProgress>(DEFAULT_DUNGEON_PROGRESS)
+  const [progressSource, setProgressSource] = useState<string>("…")
+  const [run, setRun] = useState<RunState | null>(null)
   const [busy, setBusy] = useState(false)
 
-  const [dead, setDead] = useState(false)
-  const [won, setWon] = useState(false)
-  const [revived, setRevived] = useState(false)
-
-  const roomTopRef = useRef<HTMLDivElement | null>(null)
-
   useEffect(() => {
-    ;(async () => {
-      setLoading(true)
-      try {
-        const raw = typeof window !== "undefined" ? localStorage.getItem(CURRENT_HERO_KEY) : null
-        const parsed = safeJsonParse<any | null>(raw, null)
-        setHeroRaw(parsed)
-        setHero(parsed as Hero)
-        const eq = readEquippedForHero(parsed)
-        setEquipped(eq ?? {})
+    setHero(loadCurrentHero())
 
-        const entryPots = capPotionsAtEntry(loadPotionCounts(), 5)
-        savePotionCounts(entryPots)
-        setPots(entryPots)
-      } finally {
-        setLoading(false)
-      }
+    ;(async () => {
+      const loaded = await loadDungeonProgress()
+      setProgress(loaded.progress)
+      setProgressSource(loaded.source)
     })()
+
+    const existing = loadRunState()
+    if (existing) setRun(existing)
   }, [])
 
   useEffect(() => {
-    if (!roomTopRef.current) return
-    roomTopRef.current.scrollIntoView({ behavior: "smooth", block: "start" })
-  }, [room, inBattle, loot, dead, won])
+    saveRunState(run)
+  }, [run])
 
-  const startRun = () => {
-    if (!hero || !eff) return
+  const header = useMemo(() => {
+    if (!run) return null
+    return `LEVEL ${run.level} — FLOOR ${run.floor}/10`
+  }, [run])
 
-    const mhp = hpFromHeroStats(eff.total.atk, eff.total.def)
-    setPlayerMaxHp(mhp)
-    setPlayerHp(mhp)
+  const unlockedLevelMax = useMemo(() => {
+    return Math.min(10, Math.max(1, progress.highest_level_cleared + 1))
+  }, [progress.highest_level_cleared])
 
-    setFloor(1)
-    setRunScore(0)
-    setRunGold(0)
-    setMp(50)
-    setDead(false)
-    setWon(false)
-    setRevived(false)
-
-    setLoot(null)
-    setLog(["🏰 You enter the Dungeon."])
-
-    setStarted(true)
-    const nextRoom = pickWeighted(roomWeights(1))
-    setRoom(nextRoom)
+  async function bumpProgress(patch: Partial<DungeonProgress>) {
+    const next: DungeonProgress = { ...progress, ...patch }
+    setProgress(next)
+    await saveDungeonProgress(next)
   }
 
-  const appendLog = (line: string) => {
-    setLog((prev) => [...prev.slice(-24), line])
-  }
-
-  const beginBattle = (boss: boolean) => {
-    if (!hero || !eff) return
-    const e = enemyForFloor(floor, boss)
-    setEnemy(e)
-    setLoot(null)
-
-    setInBattle(true)
-    setDefending(false)
-
-    const heroFirst = eff.total.spd >= e.spd
-    setPlayerTurn(heroFirst)
-
-    appendLog(`${boss ? "🐉" : "⚔️"} ${e.name} appears! ${heroFirst ? "Your move." : "It strikes first!"}`)
-
-    if (!heroFirst) {
-      setTimeout(() => enemyAct(e, false), 550)
+  async function startLevel(level: number) {
+    if (!hero) {
+      alert("Choose a hero first (Collection)")
+      return
     }
-  }
-
-  const endBattleWin = (e: Enemy) => {
-    setInBattle(false)
-    setEnemy(null)
-    setDefending(false)
-
-    const pts = clampInt(e.score * floor, 0, 999999)
-    const gold = clampInt(e.gold + Math.floor(Math.random() * 12) + floor * 2, 0, 999999)
-
-    setRunScore((s) => s + pts)
-    setRunGold((g) => g + gold)
-
-    appendLog(`💀 ${e.name} defeated! +${pts} score, +${gold} gold.`)
-
-    // Potion find
-    if (Math.random() < 0.22) {
-      setPots((p) => {
-        const next = { ...p, healing: p.healing + 1 }
-        savePotionCounts(next)
-        return next
+    setBusy(true)
+    try {
+      const st = newRun(level, hero)
+      // persist run counter + current position
+      await bumpProgress({
+        current_level: level,
+        current_floor: 1,
+        total_dungeon_runs: progress.total_dungeon_runs + 1,
       })
-      appendLog("🧪 Found a healing potion.")
-    }
-
-    // Drop chance by floor
-    const dropChance = floor === 10 ? 1 : 0.42
-    if (Math.random() < dropChance) {
-      const item = floor === 10 ? generateFloorDrop(10) : generateFloorDrop(floor)
-      setLoot(item)
-      appendLog(`🎁 Loot dropped: ${item.name} (${item.rarity}${item.set ? ` / ${item.set}` : ""}).`)
-    }
-  }
-
-  const endRun = async (victory: boolean) => {
-    setInBattle(false)
-    setLoot(null)
-    setEnemy(null)
-
-    // finalize run
-    setWon(victory)
-    setDead(!victory)
-
-    // persist gold
-    const baseGold = loadGold()
-    saveGold(baseGold + runGold)
-
-    // points: score + victory bonus
-    const bonus = victory ? 500 : 0
-    const finalScore = runScore + bonus
-    setRunScore(finalScore)
-    await addPoints(finalScore)
-  }
-
-  const nextFloor = () => {
-    if (!hero || !eff) return
-
-    if (floor >= 10) {
-      // Should only happen after boss
-      endRun(true).catch(() => {})
-      return
-    }
-
-    // Between-floors regen
-    const heal = Math.floor(playerMaxHp * 0.12)
-    setPlayerHp((hp) => Math.min(playerMaxHp, hp + heal))
-    setMp((m) => Math.min(50, m + 12))
-    setRunScore((s) => s + 50)
-
-    const nf = floor + 1
-    setFloor(nf)
-
-    const next = pickWeighted(roomWeights(nf))
-    setRoom(next)
-    setLoot(null)
-    appendLog(`➡️ You descend to Floor ${nf}. (+${heal} HP, +12 MP)`)
-  }
-
-  const enemyAct = (e: Enemy, fromState: boolean) => {
-    if (!eff) return
-
-    const heroDef = eff.total.def
-    const critChance = 0.08 + Math.min(0.07, Math.max(0, (e.spd - eff.total.spd) / 1000))
-    const { dmg, crit } = calcDamage(e.atk, heroDef * (defending ? 1.6 : 1), critChance, 1.7)
-
-    setDefending(false)
-    setPlayerHp((hp) => {
-      const nextHp = Math.max(0, hp - dmg)
-      if (nextHp <= 0) {
-        appendLog(`💥 ${e.name} hits for ${dmg}${crit ? " (CRIT)" : ""}. You fall...`)
-        setTimeout(() => {
-          endRun(false).catch(() => {})
-        }, 0)
-      } else {
-        appendLog(`👹 ${e.name} hits for ${dmg}${crit ? " (CRIT)" : ""}.`)
-      }
-      return nextHp
-    })
-
-    setPlayerTurn(true)
-
-    if (!fromState) {
-      // noop
-    }
-  }
-
-  const doAttack = () => {
-    if (!eff || !enemy || !inBattle || !playerTurn) return
-
-    setPlayerTurn(false)
-
-    const heroAtk = eff.total.atk
-    const critChance = 0.1 + Math.min(0.08, Math.max(0, (eff.total.spd - enemy.spd) / 1200))
-    const { dmg, crit } = calcDamage(heroAtk, enemy.def, critChance, 1.9)
-
-    const nextEnemyHp = Math.max(0, enemy.hp - dmg)
-    setEnemy({ ...enemy, hp: nextEnemyHp })
-
-    appendLog(`⚔️ You attack for ${dmg}${crit ? " (CRIT)" : ""}.`)
-
-    // if dead
-    if (nextEnemyHp <= 0) {
-      endBattleWin({ ...enemy, hp: nextEnemyHp, maxHp: enemy.maxHp })
-      return
-    }
-
-    // enemy response
-    setTimeout(() => enemyAct({ ...enemy, hp: nextEnemyHp }, true), 650)
-  }
-
-  const doDefend = () => {
-    if (!inBattle || !playerTurn) return
-    setDefending(true)
-    setPlayerTurn(false)
-    appendLog("🛡️ You defend. Incoming damage reduced.")
-    if (enemy) setTimeout(() => enemyAct(enemy, true), 650)
-  }
-
-  const doSkill = () => {
-    if (!eff || !enemy || !inBattle || !playerTurn) return
-
-    const cost = 25
-    if (mp < cost) {
-      appendLog("✨ Not enough MP.")
-      return
-    }
-
-    setPlayerTurn(false)
-    setMp((m) => Math.max(0, m - cost))
-
-    // Skill: heavy strike based on ATK + scaling with SPD
-    const heroAtk = eff.total.atk
-    const base = Math.floor(heroAtk * 0.18 + eff.total.spd * 0.03)
-    const dmg = Math.max(1, base - Math.floor(enemy.def * 0.06))
-
-    const nextEnemyHp = Math.max(0, enemy.hp - dmg)
-    setEnemy({ ...enemy, hp: nextEnemyHp })
-
-    appendLog(`✨ ${hero?.power || "Skill"}! You deal ${dmg}.`)
-
-    if (nextEnemyHp <= 0) {
-      endBattleWin({ ...enemy, hp: nextEnemyHp, maxHp: enemy.maxHp })
-      return
-    }
-
-    setTimeout(() => enemyAct({ ...enemy, hp: nextEnemyHp }, true), 650)
-  }
-
-  const usePotion = (type: PotionType) => {
-    if (!inBattle || !playerTurn) return
-    if (pots[type] <= 0) return
-
-    setPots((p) => {
-      const next = { ...p, [type]: Math.max(0, p[type] - 1) }
-      savePotionCounts(next)
-      return next
-    })
-
-    if (type === "healing") {
-      const heal = Math.floor(playerMaxHp * 0.38)
-      setPlayerHp((hp) => Math.min(playerMaxHp, hp + heal))
-      appendLog(`🧪 Healing potion: +${heal} HP.`)
-    } else if (type === "mana") {
-      const gain = 22
-      setMp((m) => Math.min(50, m + gain))
-      appendLog(`🧪 Mana potion: +${gain} MP.`)
-    } else {
-      const heal = Math.floor(playerMaxHp * 0.24)
-      const gain = 14
-      setPlayerHp((hp) => Math.min(playerMaxHp, hp + heal))
-      setMp((m) => Math.min(50, m + gain))
-      appendLog(`🧪 Elixir: +${heal} HP, +${gain} MP.`)
-    }
-
-    setPlayerTurn(false)
-    if (enemy) setTimeout(() => enemyAct(enemy, true), 650)
-  }
-
-  const equipItem = (it: Item) => {
-    const slot = it.slot
-    const next = { ...equipped, [slot]: it }
-    setEquipped(next)
-    persistEquippedForHero(heroRaw, next)
-    appendLog(`✅ Equipped ${slotLabel(slot)}: ${it.name}.`)
-  }
-
-  const saveLootToInventory = async (it: Item) => {
-    setBusy(true)
-    try {
-      await addItemToInventory(it)
-      appendLog(`📦 Saved to inventory: ${it.name}.`)
-    } catch (e: any) {
-      appendLog(`⚠️ Failed to save item: ${e?.message || String(e)}`)
+      setRun(st)
     } finally {
       setBusy(false)
     }
   }
 
-  const enterRoom = (t: RoomType) => {
-    setLoot(null)
-    setShopItems([])
-
-    if (t === "battle") {
-      beginBattle(false)
-      return
-    }
-    if (t === "boss") {
-      beginBattle(true)
-      return
-    }
-
-    setInBattle(false)
-    setEnemy(null)
-    setPlayerTurn(true)
-    setDefending(false)
-
-    if (t === "treasure") {
-      const roll = Math.random()
-      if (roll < 0.42) {
-        const g = clampInt(20 + Math.floor(Math.random() * 26) + floor * 4, 0, 999999)
-        setRunGold((x) => x + g)
-        setRunScore((s) => s + 25)
-        appendLog(`💰 Treasure: +${g} gold.`)
-      } else if (roll < 0.74) {
-        const heal = Math.floor(playerMaxHp * 0.42)
-        setPlayerHp((hp) => Math.min(playerMaxHp, hp + heal))
-        setRunScore((s) => s + 20)
-        appendLog(`💎 Healing crystal: +${heal} HP.`)
-      } else {
-        const it = generateFloorDrop(floor)
-        setLoot(it)
-        appendLog(`🎁 Found gear: ${it.name} (${it.rarity}${it.set ? ` / ${it.set}` : ""}).`)
-      }
-      return
-    }
-
-    if (t === "shop") {
-      const items = [generateFloorDrop(Math.max(2, floor)), generateFloorDrop(Math.max(2, floor)), generateFloorDrop(Math.max(2, floor))]
-      setShopItems(items)
-      appendLog("🏪 A merchant offers wares.")
-      return
-    }
-
-    if (t === "trap") {
-      appendLog("⚠️ Trap detected.")
-      return
-    }
-
-    if (t === "blessing") {
-      appendLog("🌟 A shrine hums with power.")
-      return
-    }
+  function ensureBattleEnemy(st: RunState): RunState {
+    if (st.roomType !== "battle" && st.roomType !== "boss") return st
+    if (st.enemy) return st
+    const isBoss = st.roomType === "boss"
+    const enemy = makeEnemy(st.level, isBoss)
+    return { ...st, enemy, log: [...st.log, isBoss ? `Boss encountered: ${enemy.name}` : "Enemy encountered"] }
   }
 
-  useEffect(() => {
-    if (!started) return
-    enterRoom(room)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [started, room])
+  async function nextFloor() {
+    if (!run) return
+    const nextFloor = run.floor + 1
+    if (nextFloor > 10) return
 
-  const doTrapDisarm = () => {
-    const ok = Math.random() < 0.55
-    if (ok) {
-      setRunScore((s) => s + 30)
-      setRunGold((g) => g + 12)
-      appendLog("✅ Disarmed! +30 score, +12 gold.")
-    } else {
-      const dmg = 12 + floor * 6
-      setPlayerHp((hp) => {
-        const next = Math.max(0, hp - dmg)
-        if (next <= 0) endRun(false).catch(() => {})
-        return next
-      })
-      appendLog(`💥 Failed! -${dmg} HP.`)
-    }
-  }
-
-  const doTrapTank = () => {
-    const dmg = 8 + floor * 4
-    setPlayerHp((hp) => {
-      const next = Math.max(0, hp - dmg)
-      if (next <= 0) endRun(false).catch(() => {})
-      return next
-    })
-    appendLog(`💨 You push through. -${dmg} HP.`)
-  }
-
-  const doBlessing = () => {
-    if (!hero || !eff) return
-
-    const blessings = [
-      {
-        name: "Battle Fury",
-        desc: "+18 ATK (run)",
-        fn: () => {
-          // run-only: add a pseudo item to weapon slot if empty? we instead just give MP and score
-          setRunScore((s) => s + 40)
-        },
-      },
-      {
-        name: "Iron Skin",
-        desc: "+18 DEF (run)",
-        fn: () => setRunScore((s) => s + 40),
-      },
-      {
-        name: "Life Surge",
-        desc: "Heal to full",
-        fn: () => setPlayerHp(playerMaxHp),
-      },
-      {
-        name: "Gold Rain",
-        desc: "+60 gold",
-        fn: () => setRunGold((g) => g + 60),
-      },
-      {
-        name: "Potion Cache",
-        desc: "+1 random potion",
-        fn: () =>
-          setPots((p) => {
-            const types: PotionType[] = ["healing", "mana", "elixir"]
-            const t = types[Math.floor(Math.random() * types.length)]!
-            const next = { ...p, [t]: p[t] + 1 }
-            savePotionCounts(next)
-            return next
-          }),
-      },
-      {
-        name: "Magic Refill",
-        desc: "MP to full",
-        fn: () => setMp(50),
-      },
-    ]
-
-    const b = blessings[Math.floor(Math.random() * blessings.length)]!
-    b.fn()
-    appendLog(`✨ Blessing received: ${b.name}.`)
-  }
-
-  const buyShopItem = async (it: Item) => {
-    const cost = clampInt(
-      (it.rarity === "Common" ? 40 : it.rarity === "Rare" ? 80 : it.rarity === "Epic" ? 140 : it.rarity === "Legendary" ? 220 : 260) +
-        Math.floor(Math.random() * 12),
-      1,
-      999999
-    )
-
-    const currentGold = loadGold()
-    if (currentGold < cost) {
-      appendLog(`❌ Not enough gold. Need ${cost}. (Wallet gold: ${currentGold})`)
-      return
+    const nextRoomType = roomTypeForFloor(nextFloor)
+    const next: RunState = {
+      ...run,
+      floor: nextFloor,
+      roomType: nextRoomType,
+      enemy: undefined,
+      log: [...run.log, `Descending to floor ${nextFloor}`],
     }
 
-    setBusy(true)
+    setRun(next)
+    await bumpProgress({ current_level: run.level, current_floor: nextFloor })
+  }
+
+  async function clearFloorRewards(floor: number, isBoss: boolean) {
+    if (!run) return
+    const cfg = getLevelConfig(run.level)
+
+    // Gold reward
+    const goldNow = loadGold()
+    const goldDelta = isBoss ? randInt(cfg.battleGold[0], cfg.battleGold[1]) * 2 : randInt(cfg.battleGold[0], cfg.battleGold[1])
+    saveGold(goldNow + goldDelta)
+
+    // Item drop for non-boss battles
+    if (!isBoss && Math.random() < cfg.itemDropRate) {
+      const item = generateItem()
+      await addItemToInventory(item)
+      setRun((prev) => (prev ? { ...prev, log: [...prev.log, `Loot: ${item.name} (${item.rarity})`] } : prev))
+    }
+
+    // Points
+    const battleId = `${run.runId}:${run.level}:${floor}`
+    const delta = isBoss ? 10 : 2
     try {
-      saveGold(currentGold - cost)
-      await addItemToInventory(it)
-      appendLog(`🛒 Bought ${it.name} for ${cost} gold (saved to inventory).`)
-    } catch (e: any) {
-      appendLog(`⚠️ Purchase failed: ${e?.message || String(e)}`)
-    } finally {
-      setBusy(false)
+      const mod: any = await import("@farcaster/frame-sdk")
+      const ctx: any = await mod?.sdk?.context
+      const fid = ctx?.user?.fid
+      await awardBattlePoints({ battleId, delta, fid }).catch(() => {})
+    } catch {
+      await awardBattlePoints({ battleId, delta }).catch(() => {})
     }
-  }
 
-  const doRevive = async () => {
-    if (busy || revived || !dead || won) return
-    setBusy(true)
-    try {
-      await sendTx0_0002Eth("revive")
-      setRevived(true)
-      setDead(false)
+    // local score + gold counters in run UI
+    setRun((prev) => (prev ? { ...prev, score: prev.score + delta, goldGained: prev.goldGained + goldDelta } : prev))
 
-      const healed = Math.max(1, Math.floor(playerMaxHp * 0.55))
-      setPlayerHp(healed)
-      setMp(30)
-
-      appendLog("❤️ Revived! Back in the dungeon.")
-
-      // Resume with a battle room (safer / deterministic)
-      setRoom(floor >= 10 ? "boss" : "battle")
-      setStarted(true)
-    } catch (e: any) {
-      appendLog(`⚠️ Revive failed: ${e?.message || String(e)}`)
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const doMintVictory = async () => {
-    if (busy || !won) return
-    setBusy(true)
-    try {
-      const { hash } = await sendTx0_0002Eth("victory")
-      await addPoints(100)
-      appendLog(`🏆 Victory badge minted! +100 points. Tx ${hash.slice(0, 10)}…`)
-    } catch (e: any) {
-      appendLog(`⚠️ Mint failed: ${e?.message || String(e)}`)
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const doShare = () => {
-    const txt = won
-      ? `I just CLEARED the Hero Pull dungeon (10/10) and defeated the Dragon King! 🏰🐉⚔️\nFinal score: ${runScore} ⭐\n\nTry it: `
-      : `I got wrecked in the Hero Pull dungeon on floor ${floor}… 💀\nScore: ${runScore} ⭐\n\nTry it: `
-
-    const url = shareUrl(txt)
-
-    // Try frame sdk openUrl first
-    ;(async () => {
-      try {
-        if ((frameSdk as any)?.actions?.openUrl) {
-          await (frameSdk as any).actions.openUrl(url)
-          return
+    // Progress best-cleared marker (deepest floor in the current frontier level)
+    if (run.level === progress.highest_level_cleared + 1) {
+      if (floor > progress.highest_floor_cleared) {
+        if (floor === 10) {
+          await bumpProgress({ highest_level_cleared: run.level, highest_floor_cleared: 10 })
+        } else {
+          await bumpProgress({ highest_floor_cleared: floor })
         }
-      } catch {
-        // ignore
       }
-      window.open(url, "_blank")
-    })().catch(() => {})
+    } else if (run.level > progress.highest_level_cleared + 1) {
+      // Shouldn't happen, but keep it monotonic.
+      if (floor === 10) await bumpProgress({ highest_level_cleared: run.level, highest_floor_cleared: 10 })
+      else await bumpProgress({ highest_level_cleared: run.level - 1, highest_floor_cleared: floor })
+    }
+
   }
 
-  const showSetBonus = eff?.setBonus.setName
-
-  if (loading) {
-    return <div className="px-4 pb-24"><div className="text-xs text-gray-400 text-center mt-10">Loading…</div></div>
+  async function doTreasure() {
+    if (!run) return
+    const cfg = getLevelConfig(run.level)
+    const goldNow = loadGold()
+    const goldDelta = randInt(cfg.treasureGold[0], cfg.treasureGold[1])
+    saveGold(goldNow + goldDelta)
+    setRun({ ...run, goldGained: run.goldGained + goldDelta, log: [...run.log, `Found treasure: +${goldDelta} gold`], roomType: "battle" })
   }
 
-  if (!hero || !eff) {
+  async function doRest() {
+    if (!run) return
+    const heal = Math.floor(run.hero.maxHp * 0.3)
+    const hp = clamp(run.hero.hp + heal, 0, run.hero.maxHp)
+    setRun({ ...run, hero: { ...run.hero, hp }, log: [...run.log, `Rested: +${heal} HP`], roomType: "battle" })
+  }
+
+  async function doShop() {
+    if (!run) return
+    const cost = 60
+    const goldNow = loadGold()
+    if (goldNow < cost) {
+      setRun({ ...run, log: [...run.log, `Shop: need ${cost} gold for a potion`], roomType: "battle" })
+      return
+    }
+    saveGold(goldNow - cost)
+    setRun({ ...run, hero: { ...run.hero, potions: run.hero.potions + 1 }, log: [...run.log, `Bought potion (-${cost} gold)`], roomType: "battle" })
+  }
+
+  async function startBattle() {
+    if (!run || !hero) return
+    setRun(ensureBattleEnemy(run))
+  }
+
+  function calcDamage(attAtk: number, defDef: number, variance: number) {
+    const raw = Math.floor(attAtk * variance)
+    const mitigated = Math.floor(defDef * 0.33)
+    return clamp(raw - mitigated, 1, 9999)
+  }
+
+  async function moveAttack() {
+    if (!run || !hero) return
+    const st = ensureBattleEnemy(run)
+    if (!st.enemy) return
+
+    const eff = effectiveStats(hero)
+    const enemy = st.enemy
+
+    // hero hits
+    const heroDmg = calcDamage(eff.atk, enemy.def, 0.85 + Math.random() * 0.3)
+    let enemyHp = clamp(enemy.hp - heroDmg, 0, enemy.maxHp)
+    const log: string[] = [...st.log, `You attack -${heroDmg}`]
+
+    // enemy dead?
+    if (enemyHp <= 0) {
+      const floor = st.floor
+      const isBoss = enemy.isBoss
+      const after: RunState = { ...st, enemy: { ...enemy, hp: 0 }, log: [...log, isBoss ? "Boss defeated!" : "Enemy defeated!"], roomType: "battle" }
+      setRun(after)
+      await clearFloorRewards(floor, isBoss)
+
+      if (isBoss) {
+        // boss kill stat + level clear reward
+        await bumpProgress({ total_bosses_killed: progress.total_bosses_killed + 1 })
+        await grantLevelClearReward(st.level)
+
+        // advance progression current to next level
+        const nextLevel = Math.min(10, st.level + 1)
+        await bumpProgress({
+          current_level: nextLevel,
+          current_floor: 1,
+          highest_level_cleared: Math.max(progress.highest_level_cleared, st.level),
+          highest_floor_cleared: 10,
+        })
+
+        setRun((prev) => (prev ? { ...prev, finished: true, victory: true } : prev))
+      } else {
+        await nextFloor()
+      }
+      return
+    }
+
+    // enemy retaliates
+    const enemyDmg = calcDamage(enemy.atk, eff.def, 0.8 + Math.random() * 0.25)
+    const hp = clamp(st.hero.hp - enemyDmg, 0, st.hero.maxHp)
+    log.push(`${enemy.name} hits -${enemyDmg}`)
+
+    if (hp <= 0) {
+      setRun({ ...st, hero: { ...st.hero, hp }, enemy: { ...enemy, hp: enemyHp }, log: [...log, "You died."], finished: true, victory: false })
+      return
+    }
+
+    setRun({ ...st, hero: { ...st.hero, hp }, enemy: { ...enemy, hp: enemyHp }, log })
+  }
+
+  async function movePotion() {
+    if (!run) return
+    if (run.hero.potions <= 0) {
+      setRun({ ...run, log: [...run.log, "No potions left"] })
+      return
+    }
+    const heal = Math.floor(run.hero.maxHp * 0.35)
+    const hp = clamp(run.hero.hp + heal, 0, run.hero.maxHp)
+    setRun({ ...run, hero: { ...run.hero, hp, potions: run.hero.potions - 1 }, log: [...run.log, `Potion +${heal} HP`] })
+  }
+
+  async function grantLevelClearReward(level: number) {
+    const cfg = getLevelConfig(level)
+    // Create an item and force its rarity by re-rolling until match (cheap, ok at small n)
+    let it = generateItem()
+    let guard = 0
+    while (it.rarity !== cfg.unlockRewardRarity && guard < 40) {
+      it = generateItem()
+      guard++
+    }
+    await addItemToInventory(it)
+    setRun((prev) => (prev ? { ...prev, log: [...prev.log, `Level clear reward: ${it.name} (${it.rarity})`] } : prev))
+  }
+
+  function resetToMap() {
+    setRun(null)
+    saveRunState(null)
+  }
+
+  if (!hero) {
     return (
       <div className="px-4 pb-24">
         <h1 className="text-2xl font-extrabold text-center mt-6">Dungeon</h1>
-        <p className="text-center text-gray-400 mt-2 text-sm">Select a hero first.</p>
-
-        <div className="mt-6 border border-gray-800 bg-gray-900 rounded-2xl p-5 text-sm text-gray-300">
-          No active hero found in localStorage.
-          <div className="text-xs text-gray-500 mt-2">Go to Heroes, pick a hero, then “Use in Arena” (it sets the current hero).</div>
-        </div>
-
+        <p className="text-center text-gray-400 mt-2 text-sm">Choose a hero to enter.</p>
         <div className="mt-6 flex flex-col gap-2">
-          <a href="/collection" className="bg-indigo-700 hover:bg-indigo-600 text-white text-sm font-bold py-3 rounded-xl text-center">
+          <a href="/collection?v=1" className="bg-gray-800 hover:bg-gray-700 text-white text-sm font-bold py-3 rounded-xl text-center">
             Choose Hero
           </a>
-          <a href="/arena" className="bg-gray-800 hover:bg-gray-700 text-white text-sm font-bold py-3 rounded-xl text-center">
+          <a href="/arena" className="bg-purple-700 hover:bg-purple-600 text-white text-sm font-bold py-3 rounded-xl text-center">
             Back to Arena
           </a>
         </div>
@@ -947,329 +398,146 @@ export default function DungeonPage() {
 
   return (
     <div className="px-4 pb-24">
-      <div ref={roomTopRef} />
+      <h1 className="text-2xl font-extrabold text-center mt-6">Dungeon</h1>
+      <p className="text-center text-gray-400 mt-2 text-sm">10 Levels • 10 Floors each</p>
 
-      <div className="flex items-center justify-between mt-6">
-        <div>
-          <div className="text-xl font-extrabold">Dungeon</div>
-          <div className="text-xs text-gray-400">Floor {floor}/10</div>
-        </div>
-        <div className="text-right text-xs">
-          <div className="text-yellow-300 font-bold">🪙 Run +{runGold}</div>
-          <div className="text-green-400 font-bold">⭐ {runScore}</div>
-        </div>
-      </div>
-
-      <div className="mt-4 border border-gray-800 bg-gray-900 rounded-2xl p-4">
-        <div className="flex items-center gap-3">
-          <img src={hero.imageUrl} alt={hero.name} className="w-16 h-16 rounded-2xl object-cover border border-gray-700" />
-          <div className="min-w-0 flex-1">
-            <div className="font-extrabold truncate">{hero.name}</div>
-            <div className="text-xs text-gray-400 truncate">{hero.rarity} • {hero.power}</div>
-            {showSetBonus ? (
-              <div className="mt-1 inline-flex items-center gap-1 text-[10px] font-extrabold text-[#f97316] border border-[#f97316]/60 bg-[#f97316]/10 px-2 py-0.5 rounded-full">
-                🔥 FULL SET BONUS • {eff.setBonus.setName} (+{FULL_SET_BONUS.atk}/{FULL_SET_BONUS.def}/{FULL_SET_BONUS.spd})
+      {run ? (
+        <div className="mt-6">
+          <div className="border border-gray-800 bg-gray-900 rounded-2xl p-5">
+            <div className="text-sm text-gray-400">{header}</div>
+            <div className="mt-2 flex items-center justify-between text-xs text-gray-300">
+              <div>
+                HP: <span className="font-bold">{run.hero.hp}</span>/{run.hero.maxHp}
               </div>
-            ) : null}
-          </div>
-        </div>
-
-        <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
-          <div className="border border-gray-800 rounded-xl p-2 bg-gray-950/30">
-            <div className="text-gray-400">HP</div>
-            <div className="font-bold text-gray-100">{playerHp}/{playerMaxHp}</div>
-          </div>
-          <div className="border border-gray-800 rounded-xl p-2 bg-gray-950/30">
-            <div className="text-gray-400">MP</div>
-            <div className="font-bold text-gray-100">{mp}/50</div>
-          </div>
-          <div className="border border-gray-800 rounded-xl p-2 bg-gray-950/30">
-            <div className="text-gray-400">ATK / DEF / SPD</div>
-            <div className="font-bold text-gray-100">
-              {eff.total.atk} / {eff.total.def} / {eff.total.spd}
-            </div>
-          </div>
-          <div className="border border-gray-800 rounded-xl p-2 bg-gray-950/30">
-            <div className="text-gray-400">Potions (cap 5)</div>
-            <div className="font-bold text-gray-100">🧪 {pots.healing} • 🔷 {pots.mana} • ✨ {pots.elixir}</div>
-          </div>
-        </div>
-
-        {!started ? (
-          <button
-            onClick={startRun}
-            className="mt-4 w-full bg-yellow-600 hover:bg-yellow-500 text-white font-extrabold py-3 rounded-xl"
-          >
-            ▶ Start Run
-          </button>
-        ) : null}
-      </div>
-
-      {/* End screens */}
-      {won ? (
-        <div className="mt-6 border border-yellow-500/40 bg-yellow-500/10 rounded-2xl p-5">
-          <div className="text-lg font-extrabold text-yellow-200">🏆 Dungeon Cleared!</div>
-          <div className="text-xs text-gray-300 mt-1">Final score saved to points. Run gold added to your wallet gold.</div>
-
-          <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
-            <div className="border border-gray-800 rounded-xl p-2 bg-gray-950/30">⭐ Score: <span className="font-bold">{runScore}</span></div>
-            <div className="border border-gray-800 rounded-xl p-2 bg-gray-950/30">🪙 Gold gained: <span className="font-bold">{runGold}</span></div>
-          </div>
-
-          <div className="mt-4 flex flex-col gap-2">
-            <button
-              disabled={busy}
-              onClick={() => doMintVictory().catch(() => {})}
-              className="w-full bg-yellow-600 hover:bg-yellow-500 disabled:opacity-50 text-white font-extrabold py-3 rounded-xl"
-            >
-              {busy ? "Processing…" : "⛓ Mint Victory Badge (0.0002 ETH)"}
-            </button>
-            <button
-              onClick={doShare}
-              className="w-full bg-indigo-700 hover:bg-indigo-600 text-white font-extrabold py-3 rounded-xl"
-            >
-              Share
-            </button>
-            <button
-              onClick={() => {
-                setStarted(false)
-                setFloor(1)
-                setRoom("battle")
-                setLog([])
-              }}
-              className="w-full bg-gray-800 hover:bg-gray-700 text-white font-extrabold py-3 rounded-xl"
-            >
-              Play Again
-            </button>
-          </div>
-        </div>
-      ) : null}
-
-      {dead ? (
-        <div className="mt-6 border border-red-500/40 bg-red-500/10 rounded-2xl p-5">
-          <div className="text-lg font-extrabold text-red-200">💀 You Died</div>
-          <div className="text-xs text-gray-300 mt-1">Collected items you saved are kept. Run gold is still awarded.</div>
-
-          <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
-            <div className="border border-gray-800 rounded-xl p-2 bg-gray-950/30">🏰 Floor: <span className="font-bold">{floor}</span></div>
-            <div className="border border-gray-800 rounded-xl p-2 bg-gray-950/30">⭐ Score: <span className="font-bold">{runScore}</span></div>
-          </div>
-
-          <div className="mt-4 flex flex-col gap-2">
-            <button
-              disabled={busy || revived}
-              onClick={() => doRevive().catch(() => {})}
-              className="w-full bg-purple-700 hover:bg-purple-600 disabled:opacity-50 text-white font-extrabold py-3 rounded-xl"
-            >
-              {revived ? "Revive used" : busy ? "Processing…" : "❤️ Revive (0.0002 ETH)"}
-            </button>
-            <button onClick={doShare} className="w-full bg-indigo-700 hover:bg-indigo-600 text-white font-extrabold py-3 rounded-xl">
-              Share
-            </button>
-            <button
-              onClick={() => {
-                setStarted(false)
-                setFloor(1)
-                setRoom("battle")
-                setLog([])
-              }}
-              className="w-full bg-gray-800 hover:bg-gray-700 text-white font-extrabold py-3 rounded-xl"
-            >
-              Retry
-            </button>
-          </div>
-        </div>
-      ) : null}
-
-      {/* Room header */}
-      {started && !won && !dead ? (
-        <div className="mt-6 border border-gray-800 bg-gray-900 rounded-2xl p-4">
-          <div className="flex items-center justify-between">
-            <div className="font-extrabold">
-              {room === "battle" ? "⚔️ Battle" : room === "boss" ? "🐉 Boss" : room === "treasure" ? "💰 Treasure" : room === "shop" ? "🏪 Shop" : room === "trap" ? "⚠️ Trap" : "🌟 Shrine"}
-            </div>
-            <div className="text-xs text-gray-400">Turn-based</div>
-          </div>
-
-          {/* Room body */}
-          {(room === "battle" || room === "boss") && enemy ? (
-            <div className="mt-3">
-              <div className="flex items-center justify-between border border-gray-800 rounded-xl p-3 bg-gray-950/30">
-                <div className="flex items-center gap-3">
-                  <div className="text-3xl">{enemy.emoji}</div>
-                  <div>
-                    <div className="font-bold text-sm text-red-200">{enemy.name}</div>
-                    <div className="text-[11px] text-gray-400">ATK {enemy.atk} • DEF {enemy.def} • SPD {enemy.spd}</div>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="text-xs text-gray-400">HP</div>
-                  <div className="font-extrabold text-sm text-gray-100">{enemy.hp}/{enemy.maxHp}</div>
-                </div>
+              <div>
+                🧪 <span className="font-bold">{run.hero.potions}</span>
               </div>
-
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                <button
-                  disabled={!inBattle || !playerTurn}
-                  onClick={doAttack}
-                  className="bg-red-600 hover:bg-red-500 disabled:opacity-40 text-white font-extrabold py-3 rounded-xl text-sm"
-                >
-                  Attack
-                </button>
-                <button
-                  disabled={!inBattle || !playerTurn}
-                  onClick={doDefend}
-                  className="bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white font-extrabold py-3 rounded-xl text-sm"
-                >
-                  Defend
-                </button>
-                <button
-                  disabled={!inBattle || !playerTurn}
-                  onClick={doSkill}
-                  className="bg-green-700 hover:bg-green-600 disabled:opacity-40 text-white font-extrabold py-3 rounded-xl text-sm"
-                >
-                  Skill (25 MP)
-                </button>
-                <div className="grid grid-cols-3 gap-1">
-                  <button
-                    disabled={!inBattle || !playerTurn || pots.healing <= 0}
-                    onClick={() => usePotion("healing")}
-                    className="bg-gray-800 hover:bg-gray-700 disabled:opacity-40 text-white font-bold py-3 rounded-xl text-[11px]"
-                  >
-                    🧪 {pots.healing}
-                  </button>
-                  <button
-                    disabled={!inBattle || !playerTurn || pots.mana <= 0}
-                    onClick={() => usePotion("mana")}
-                    className="bg-gray-800 hover:bg-gray-700 disabled:opacity-40 text-white font-bold py-3 rounded-xl text-[11px]"
-                  >
-                    🔷 {pots.mana}
-                  </button>
-                  <button
-                    disabled={!inBattle || !playerTurn || pots.elixir <= 0}
-                    onClick={() => usePotion("elixir")}
-                    className="bg-gray-800 hover:bg-gray-700 disabled:opacity-40 text-white font-bold py-3 rounded-xl text-[11px]"
-                  >
-                    ✨ {pots.elixir}
-                  </button>
-                </div>
+              <div>
+                ⭐ <span className="font-bold">{run.score}</span>
               </div>
-
-              {!inBattle ? (
-                <button
-                  onClick={nextFloor}
-                  className="mt-4 w-full bg-yellow-600 hover:bg-yellow-500 text-white font-extrabold py-3 rounded-xl"
-                >
-                  ▶ Next Floor
-                </button>
-              ) : (
-                <div className="mt-3 text-xs text-gray-400">{playerTurn ? "Your turn" : "Enemy turn"}</div>
-              )}
+              <div>
+                🪙 <span className="font-bold">{run.goldGained}</span>
+              </div>
             </div>
-          ) : null}
 
-          {room === "treasure" && !enemy ? (
-            <div className="mt-3">
-              <div className="text-xs text-gray-400">Claim the rewards and move on.</div>
-              <button onClick={nextFloor} className="mt-4 w-full bg-yellow-600 hover:bg-yellow-500 text-white font-extrabold py-3 rounded-xl">
-                ▶ Next Floor
+            <div className="mt-4 text-xs text-gray-400">
+              {run.roomType === "boss" ? "Boss Floor" : run.roomType === "battle" ? "Battle" : run.roomType === "treasure" ? "Treasure" : run.roomType === "rest" ? "Rest" : "Shop"}
+            </div>
+
+            {!run.finished && run.roomType === "treasure" && (
+              <button onClick={doTreasure} className="mt-3 w-full bg-yellow-700 hover:bg-yellow-600 text-white text-sm font-bold py-3 rounded-xl">
+                Open Treasure
               </button>
-            </div>
-          ) : null}
+            )}
 
-          {room === "shop" ? (
-            <div className="mt-3">
-              <div className="text-xs text-gray-400">Buys spend your wallet gold (hero-pull-gold) and save items to inventory.</div>
-              <div className="mt-3 grid grid-cols-1 gap-2">
-                {shopItems.map((it) => (
-                  <div key={it.id} className={`border-2 rounded-xl p-3 bg-gray-950/30 ${rarityBorder(it.rarity)}`}>
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <div className="font-extrabold text-sm">{it.imageEmoji} {it.name}</div>
-                        <div className="text-[11px] text-gray-400">{it.rarity} • {slotLabel(it.slot)}{it.set ? ` • Set ${it.set}` : ""}</div>
-                        <div className="text-[11px] text-gray-300 mt-1">+{it.bonusATK} ATK • +{it.bonusDEF} DEF • +{it.bonusSPD} SPD</div>
+            {!run.finished && run.roomType === "rest" && (
+              <button onClick={doRest} className="mt-3 w-full bg-green-700 hover:bg-green-600 text-white text-sm font-bold py-3 rounded-xl">
+                Rest (+HP)
+              </button>
+            )}
+
+            {!run.finished && run.roomType === "shop" && (
+              <button onClick={doShop} className="mt-3 w-full bg-purple-700 hover:bg-purple-600 text-white text-sm font-bold py-3 rounded-xl">
+                Buy Potion (60 gold)
+              </button>
+            )}
+
+            {!run.finished && (run.roomType === "battle" || run.roomType === "boss") && (
+              <div className="mt-4">
+                {!run.enemy ? (
+                  <button onClick={startBattle} className="w-full bg-red-700 hover:bg-red-600 text-white text-sm font-bold py-3 rounded-xl">
+                    {run.roomType === "boss" ? "Fight Boss" : "Fight"}
+                  </button>
+                ) : (
+                  <div className="border border-gray-800 bg-black/20 rounded-xl p-3">
+                    <div className="flex items-center justify-between text-sm text-gray-200">
+                      <div className="font-bold">{run.enemy.name}{run.enemy.isBoss ? " (BOSS)" : ""}</div>
+                      <div className="text-xs text-gray-400">
+                        HP {run.enemy.hp}/{run.enemy.maxHp}
                       </div>
-                      <button
-                        disabled={busy}
-                        onClick={() => buyShopItem(it).catch(() => {})}
-                        className="bg-yellow-600 hover:bg-yellow-500 disabled:opacity-50 text-white font-extrabold py-2 px-3 rounded-xl text-xs"
-                      >
-                        Buy
+                    </div>
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      <button onClick={moveAttack} className="bg-red-700 hover:bg-red-600 text-white text-sm font-bold py-3 rounded-xl">
+                        Attack
+                      </button>
+                      <button onClick={movePotion} className="bg-orange-700 hover:bg-orange-600 text-white text-sm font-bold py-3 rounded-xl">
+                        Potion
                       </button>
                     </div>
                   </div>
-                ))}
+                )}
               </div>
-              <button onClick={nextFloor} className="mt-4 w-full bg-yellow-600 hover:bg-yellow-500 text-white font-extrabold py-3 rounded-xl">
-                ▶ Leave Shop
-              </button>
-            </div>
-          ) : null}
+            )}
 
-          {room === "trap" ? (
-            <div className="mt-3">
-              <div className="text-xs text-gray-400">A pressure plate blocks your way.</div>
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                <button onClick={doTrapDisarm} className="bg-blue-600 hover:bg-blue-500 text-white font-extrabold py-3 rounded-xl text-sm">
-                  Disarm (55%)
-                </button>
-                <button onClick={doTrapTank} className="bg-red-600 hover:bg-red-500 text-white font-extrabold py-3 rounded-xl text-sm">
-                  Tank it
+            {run.finished && (
+              <div className="mt-4">
+                <div className={`text-center text-lg font-extrabold ${run.victory ? "text-yellow-300" : "text-red-300"}`}>
+                  {run.victory ? "LEVEL CLEARED" : "RUN FAILED"}
+                </div>
+                <div className="text-center text-xs text-gray-400 mt-1">Score gained: {run.score} • Gold gained: {run.goldGained}</div>
+                <button onClick={resetToMap} className="mt-3 w-full bg-gray-800 hover:bg-gray-700 text-white text-sm font-bold py-3 rounded-xl">
+                  Back to Map
                 </button>
               </div>
-              <button onClick={nextFloor} className="mt-4 w-full bg-yellow-600 hover:bg-yellow-500 text-white font-extrabold py-3 rounded-xl">
-                ▶ Next Floor
-              </button>
+            )}
+
+            <div className="mt-4 text-[11px] text-gray-500 whitespace-pre-line">
+              {run.log.slice(-6).join("\n")}
             </div>
-          ) : null}
+          </div>
 
-          {room === "blessing" ? (
-            <div className="mt-3">
-              <div className="text-xs text-gray-400">Accept a random blessing.</div>
-              <button onClick={doBlessing} className="mt-3 w-full bg-purple-700 hover:bg-purple-600 text-white font-extrabold py-3 rounded-xl">
-                Accept Blessing
-              </button>
-              <button onClick={nextFloor} className="mt-3 w-full bg-yellow-600 hover:bg-yellow-500 text-white font-extrabold py-3 rounded-xl">
-                ▶ Next Floor
-              </button>
-            </div>
-          ) : null}
-
-          {/* Loot */}
-          {loot ? (
-            <div className={`mt-4 border-2 rounded-2xl p-4 bg-gray-950/30 ${rarityBorder(loot.rarity)}`}>
-              <div className="text-sm font-extrabold">🎁 Loot</div>
-              <div className="mt-1 text-xs text-gray-300 font-bold">{loot.imageEmoji} {loot.name}</div>
-              <div className="text-[11px] text-gray-400">{loot.rarity} • {slotLabel(loot.slot)}{loot.set ? ` • Set ${loot.set}` : ""}</div>
-              <div className="text-[11px] text-gray-300 mt-1">+{loot.bonusATK} ATK • +{loot.bonusDEF} DEF • +{loot.bonusSPD} SPD</div>
-
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                <button onClick={() => equipItem(loot)} className="bg-green-700 hover:bg-green-600 text-white font-extrabold py-2 rounded-xl text-xs">
-                  Equip
-                </button>
-                <button disabled={busy} onClick={() => saveLootToInventory(loot).catch(() => {})} className="bg-indigo-700 hover:bg-indigo-600 disabled:opacity-50 text-white font-extrabold py-2 rounded-xl text-xs">
-                  Save
-                </button>
-              </div>
-              <div className="mt-2 text-[11px] text-gray-500">Equip updates your hero’s equipped items; Save adds it to your inventory.</div>
-            </div>
-          ) : null}
-
-          {/* Log */}
-          <div className="mt-4 border border-gray-800 bg-black/20 rounded-xl p-3 text-[11px] text-gray-400 leading-relaxed max-h-48 overflow-auto">
-            {log.length ? log.map((l, i) => <div key={i}>{l}</div>) : <div>(log)</div>}
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <a href="/collection" className="bg-gray-800 hover:bg-gray-700 text-white text-sm font-bold py-3 rounded-xl text-center">
+              Hero / Items
+            </a>
+            <button onClick={resetToMap} className="bg-gray-900 hover:bg-gray-800 border border-gray-800 text-white text-sm font-bold py-3 rounded-xl">
+              Abandon
+            </button>
           </div>
         </div>
-      ) : null}
+      ) : (
+        <>
+          <div className="mt-6 border border-gray-800 bg-gray-900 rounded-2xl p-5">
+            <div className="text-sm text-gray-400">Progress ({progressSource})</div>
+            <div className="mt-2 text-xs text-gray-300">
+              Current: Level {progress.current_level}, Floor {progress.current_floor}/10
+            </div>
+            <div className="mt-1 text-xs text-gray-300">
+              Highest cleared: Level {progress.highest_level_cleared}, Floor {progress.highest_floor_cleared}/10
+            </div>
+            <div className="mt-1 text-xs text-gray-300">Runs: {progress.total_dungeon_runs} • Bosses: {progress.total_bosses_killed}</div>
+          </div>
 
-      <div className="mt-8 flex flex-col gap-2">
-        <a href="/arena" className="bg-gray-800 hover:bg-gray-700 text-white text-sm font-bold py-3 rounded-xl text-center">
-          Back to Arena
-        </a>
-        <a href="/collection" className="bg-gray-800 hover:bg-gray-700 text-white text-sm font-bold py-3 rounded-xl text-center">
-          Heroes
-        </a>
-      </div>
+          <div className="mt-6 grid grid-cols-2 gap-3">
+            {DUNGEON_LEVELS.map((lvl) => {
+              const unlocked = lvl.level <= unlockedLevelMax
+              return (
+                <button
+                  key={lvl.level}
+                  disabled={!unlocked || busy}
+                  onClick={() => startLevel(lvl.level)}
+                  className={`text-left border rounded-2xl p-4 ${unlocked ? "bg-gray-900 border-gray-800 hover:border-purple-500" : "bg-gray-950 border-gray-900 opacity-60"}`}
+                >
+                  <div className="text-xs text-gray-400">LEVEL {lvl.level}</div>
+                  <div className="text-sm font-extrabold mt-1 text-white">{lvl.name}</div>
+                  <div className="text-[11px] text-gray-400 mt-1">{lvl.difficulty}</div>
+                  <div className="text-[11px] text-gray-500 mt-2">Reward: {lvl.unlockRewardRarity} item</div>
+                  {!unlocked && <div className="text-[11px] text-red-300 mt-2">🔒 Locked</div>}
+                </button>
+              )
+            })}
+          </div>
+
+          <div className="mt-6 flex flex-col gap-2">
+            <a href="/arena" className="bg-purple-700 hover:bg-purple-600 text-white text-sm font-bold py-3 rounded-xl text-center">
+              Back to Arena
+            </a>
+            <a href="/stats" className="bg-gray-800 hover:bg-gray-700 text-white text-sm font-bold py-3 rounded-xl text-center">
+              View Stats
+            </a>
+          </div>
+        </>
+      )}
     </div>
   )
 }
