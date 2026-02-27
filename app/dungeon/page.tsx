@@ -139,10 +139,11 @@ function persistEquippedForHero(current: any, equipped: EquippedItems) {
 }
 
 function calcDamage(attackerAtk: number, defenderDef: number, critChance: number, critMult: number) {
-  const roll = 0.85 + Math.random() * 0.3
-  let dmg = Math.floor(attackerAtk * 0.12 * roll)
-  dmg -= Math.floor(defenderDef * 0.07)
-  dmg = Math.max(1, dmg)
+  // Faster, punchier combat: higher base damage and slightly lower DEF mitigation.
+  const roll = 0.9 + Math.random() * 0.25
+  let dmg = Math.floor(attackerAtk * 0.22 * roll)
+  dmg -= Math.floor(defenderDef * 0.06)
+  dmg = Math.max(3, dmg)
   const crit = Math.random() < critChance
   if (crit) dmg = Math.floor(dmg * critMult)
   return { dmg, crit }
