@@ -301,9 +301,14 @@ function enemyFromLevel(level: number, floor: number, boss: boolean): Enemy {
 
   const base = boss ? cfg.boss : { ...cfg.enemy, name: "Enemy", emoji: "👺" }
 
-  const hp = clampInt(randInt(base.hp[0], base.hp[1]) * (boss ? 1.0 : fScale), 1, 999999)
-  const atk = clampInt(randInt(base.atk[0], base.atk[1]) * (boss ? 1.0 : fScale), 1, 999999)
-  const def = clampInt(randInt(base.def[0], base.def[1]) * (boss ? 1.0 : fScale), 1, 999999)
+  // Medium difficulty baseline (after faster combat tuning)
+  const diffHp = boss ? 1.18 : 1.25
+  const diffAtk = boss ? 1.15 : 1.2
+  const diffDef = boss ? 1.08 : 1.1
+
+  const hp = clampInt(randInt(base.hp[0], base.hp[1]) * (boss ? 1.0 : fScale) * diffHp, 1, 999999)
+  const atk = clampInt(randInt(base.atk[0], base.atk[1]) * (boss ? 1.0 : fScale) * diffAtk, 1, 999999)
+  const def = clampInt(randInt(base.def[0], base.def[1]) * (boss ? 1.0 : fScale) * diffDef, 1, 999999)
   const lck = clampInt(randInt(base.lck[0], base.lck[1]) * (boss ? 1.0 : 1 + (floor - 1) * 0.03), 1, 999999)
 
   const score = clampInt(22 + level * 10 + floor * 3 + Math.floor((atk + def + lck) / 180), 1, 999999)
