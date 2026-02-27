@@ -71,9 +71,22 @@ export function WalletHeroes({ onSelect }: { onSelect?: (hero: Hero & { tokenId?
               onClick={() => onSelect?.(h)}
               className="border border-gray-700 bg-gray-900 rounded-2xl p-3 text-left hover:border-purple-500"
             >
-              <div className="text-xs text-gray-500">#{h.tokenId}</div>
-              <div className="font-bold">{h.name}</div>
-              <div className="text-xs text-gray-400">{h.rarity} • Lvl {h.level}</div>
+              <div className="flex items-center gap-3">
+                <img
+                  src={h.imageUrl}
+                  alt={h.name}
+                  className="w-14 h-14 rounded-xl object-cover border border-gray-700"
+                  onError={(e) => {
+                    const seed = encodeURIComponent(h.name)
+                    ;(e.currentTarget as HTMLImageElement).src = `https://api.dicebear.com/7.x/adventurer/svg?seed=${seed}`
+                  }}
+                />
+                <div className="min-w-0">
+                  <div className="text-xs text-gray-500">#{h.tokenId}</div>
+                  <div className="font-bold truncate">{h.name}</div>
+                  <div className="text-xs text-gray-400">{h.rarity} • Lvl {h.level}</div>
+                </div>
+              </div>
             </button>
           ))}
         </div>
