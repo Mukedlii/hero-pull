@@ -14,38 +14,50 @@ export default function StatsPage() {
   const [leaderboard, setLeaderboard] = useState<Item[]>([])
 
   useEffect(() => {
-    // Prefer Supabase stats when wallet connected
     ;(async () => {
+      // 1) Always try to load leaderboard (fid-based)
+      try {
+        const lb = await fetch("/api/leaderboard?limit=25", { cache: "no-store" }).then((r) => r.json())
+        setLeaderboard(Array.isArray(lb?.items) ? lb.items : [])
+      } catch {
+        setLeaderboard([])
+      }
+
+      // 2) Prefer wallet stats IF available, but don't early-return if missing
+      let walletPoints: number | null = null
       try {
         const wallet = await getWalletAddress()
         if (wallet) {
           const s: any = await loadStats(wallet)
-          if (s?.points != null) setScore(Number(s.points))
-          else setScore(0)
-          return
+          if (s?.points != null) walletPoints = Number(s.points)
         }
       } catch {
         // ignore
       }
 
-      // fallback: existing fid-based scoring
-      readScore().then(setScore).catch(() => setScore(0))
-
+      // 3) Fallback to fid-based score
+      let fidPoints: number | null = null
       try {
         const mod: any = await import("@farcaster/frame-sdk")
         const ctx: any = await mod?.sdk?.context
         const f = ctx?.user?.fid
-        if (!f) return
-        setFid(f)
-
-        const lb = await fetch("/api/leaderboard?limit=25", { cache: "no-store" }).then((r) => r.json())
-        setLeaderboard(Array.isArray(lb?.items) ? lb.items : [])
-
-        const me = await fetch(`/api/profile?fid=${f}`, { cache: "no-store" }).then((r) => r.json())
-        if (me?.item?.score != null) setScore(Number(me.item.score))
+        if (f) {
+          setFid(f)
+          const me = await fetch(`/api/profile?fid=${f}`, { cache: "no-store" }).then((r) => r.json())
+          if (me?.item?.score != null) fidPoints = Number(me.item.score)
+          else {
+            // legacy in-memory store
+            fidPoints = await readScore().catch(() => 0)
+          }
+        }
       } catch {
         // ignore
       }
+
+      // Choose best available
+      if (walletPoints != null) setScore(walletPoints)
+      else if (fidPoints != null) setScore(fidPoints)
+      else readScore().then(setScore).catch(() => setScore(0))
     })()
   }, [])
 
