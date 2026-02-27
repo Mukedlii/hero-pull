@@ -502,6 +502,12 @@ export default function DungeonPage() {
         const g = clampInt(randInt(levelCfg.treasureGold[0], levelCfg.treasureGold[1]) + floor * 2, 0, 999999)
         setRunGold((x) => x + g)
         setRunScore((s) => s + 25 + level * 2)
+        try {
+          const baseGold = loadGold()
+          saveGold(baseGold + g)
+        } catch {
+          // ignore
+        }
         appendLog(`💰 Treasure: +${g} gold.`)
       } else if (roll < 0.72) {
         const heal = Math.floor(playerMaxHp * 0.42)
@@ -595,6 +601,14 @@ export default function DungeonPage() {
 
     setRunScore((s) => s + pts)
     setRunGold((g) => g + gold)
+
+    // Bank a bit of gold immediately so even short runs feel rewarding.
+    try {
+      const baseGold = loadGold()
+      saveGold(baseGold + gold)
+    } catch {
+      // ignore
+    }
 
     appendLog(`💀 ${e.name} defeated! +${pts} score, +${gold} gold.`)
 
@@ -842,9 +856,7 @@ export default function DungeonPage() {
 
     setDead(!victory)
 
-    // award persistent gold
-    const baseGold = loadGold()
-    saveGold(baseGold + runGold)
+    // Gold is banked immediately on wins/treasure so runs always feel rewarding.
 
     // final points
     const bonus = victory ? 1000 : 0
