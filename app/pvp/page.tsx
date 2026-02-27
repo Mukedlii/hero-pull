@@ -34,6 +34,18 @@ function heroToPvP(h: Hero & { tokenId?: string }): PvPHero {
   }
 }
 
+function hpPct(hp: number, maxHp: number) {
+  if (!maxHp) return 0
+  return Math.max(0, Math.min(100, Math.round((hp / maxHp) * 100)))
+}
+
+const rarityBorder: Record<string, string> = {
+  Common: "border-gray-500",
+  Rare: "border-blue-500 shadow-[0_0_12px_#60a5fa]",
+  Epic: "border-purple-500 shadow-[0_0_15px_#c084fc]",
+  Legendary: "border-yellow-400 shadow-[0_0_20px_#ffd700]",
+}
+
 export default function PvPPage() {
   const sp = useSearchParams()
   const matchId = sp.get("m")
@@ -321,31 +333,7 @@ export default function PvPPage() {
 
           {match.status !== "lobby" && match.state && match.p1_hero && match.p2_hero && (
             <div className="mt-6 border border-gray-800 bg-gray-900 rounded-2xl p-4">
-              <div className="flex justify-between text-xs text-gray-400">
-                <div>
-                  <div className="font-bold text-white">P1</div>
-                  <div className="text-[10px]">{match.p1_hero.name}</div>
-                </div>
-                <div>
-                  <div className="font-bold text-white text-right">P2</div>
-                  <div className="text-[10px] text-right">{match.p2_hero.name}</div>
-                </div>
-              </div>
-
-              <div className="mt-3 grid grid-cols-2 gap-3">
-                <div className="border border-gray-800 rounded-xl p-3">
-                  <div className="text-xs text-gray-500">HP</div>
-                  <div className="text-sm font-extrabold">{match.state.p1.hp}/{match.state.p1.maxHp}</div>
-                  <div className="text-[10px] text-gray-500">Potions: {match.state.p1.potions}</div>
-                </div>
-                <div className="border border-gray-800 rounded-xl p-3 text-right">
-                  <div className="text-xs text-gray-500">HP</div>
-                  <div className="text-sm font-extrabold">{match.state.p2.hp}/{match.state.p2.maxHp}</div>
-                  <div className="text-[10px] text-gray-500">Potions: {match.state.p2.potions}</div>
-                </div>
-              </div>
-
-              <div className="mt-4 text-center text-xs">
+              <div className="text-center text-xs text-gray-400">
                 {match.state.finished ? (
                   <span className="text-yellow-300 font-bold">Winner: {match.state.winner?.toUpperCase()}</span>
                 ) : (
@@ -355,35 +343,78 @@ export default function PvPPage() {
                 )}
               </div>
 
+              <div className="mt-4 grid grid-cols-2 gap-3">
+                <div className={`border-2 rounded-xl p-3 bg-gray-950 ${rarityBorder[match.p1_hero.rarity] || "border-gray-700"}`}>
+                  <div className="flex items-center gap-2">
+                    <img src={match.p1_hero.imageUrl} className="w-12 h-12 rounded-xl object-cover border border-gray-800" alt={match.p1_hero.name} />
+                    <div className="min-w-0">
+                      <div className="text-[10px] text-gray-500">P1 • #{match.p1_hero.tokenId}</div>
+                      <div className="text-xs font-bold truncate">{match.p1_hero.name}</div>
+                      <div className="text-[10px] text-gray-400">{match.p1_hero.rarity} • Lv.{match.p1_hero.level}</div>
+                    </div>
+                  </div>
+
+                  <div className="mt-2 text-[10px] text-gray-500">HP {match.state.p1.hp}/{match.state.p1.maxHp}</div>
+                  <div className="mt-1 h-2 bg-gray-800 rounded">
+                    <div className="h-2 bg-red-500 rounded" style={{ width: `${hpPct(match.state.p1.hp, match.state.p1.maxHp)}%` }} />
+                  </div>
+                  <div className="mt-2 text-[10px] text-gray-500">Potion: {match.state.p1.potions}</div>
+                </div>
+
+                <div className={`border-2 rounded-xl p-3 bg-gray-950 ${rarityBorder[match.p2_hero.rarity] || "border-gray-700"}`}>
+                  <div className="flex items-center gap-2">
+                    <img src={match.p2_hero.imageUrl} className="w-12 h-12 rounded-xl object-cover border border-gray-800" alt={match.p2_hero.name} />
+                    <div className="min-w-0">
+                      <div className="text-[10px] text-gray-500">P2 • #{match.p2_hero.tokenId}</div>
+                      <div className="text-xs font-bold truncate">{match.p2_hero.name}</div>
+                      <div className="text-[10px] text-gray-400">{match.p2_hero.rarity} • Lv.{match.p2_hero.level}</div>
+                    </div>
+                  </div>
+
+                  <div className="mt-2 text-[10px] text-gray-500">HP {match.state.p2.hp}/{match.state.p2.maxHp}</div>
+                  <div className="mt-1 h-2 bg-gray-800 rounded">
+                    <div className="h-2 bg-red-500 rounded" style={{ width: `${hpPct(match.state.p2.hp, match.state.p2.maxHp)}%` }} />
+                  </div>
+                  <div className="mt-2 text-[10px] text-gray-500">Potion: {match.state.p2.potions}</div>
+                </div>
+              </div>
+
+              <div className="mt-4 border border-gray-800 rounded-xl p-3 bg-black/20">
+                <div className="text-xs font-bold">⚔️ Battle Log</div>
+                <div className="mt-2 max-h-44 overflow-auto">
+                  {match.state.log.slice(-20).map((l, i) => (
+                    <div key={i} className="text-[10px] text-gray-300">{l}</div>
+                  ))}
+                </div>
+              </div>
+
               <div className="mt-4 grid grid-cols-3 gap-2">
                 <button
                   disabled={!isMyTurn || busy || match.state.finished}
                   onClick={() => doMove("attack").catch(() => {})}
                   className="bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white text-xs py-2 rounded-xl"
                 >
-                  Attack
+                  ⚔️ Attack
                 </button>
                 <button
                   disabled={!isMyTurn || busy || match.state.finished}
                   onClick={() => doMove("defend").catch(() => {})}
                   className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-xs py-2 rounded-xl"
                 >
-                  Defend
+                  🛡 Defend
                 </button>
                 <button
                   disabled={!isMyTurn || busy || match.state.finished}
                   onClick={() => doMove("potion").catch(() => {})}
                   className="bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white text-xs py-2 rounded-xl"
                 >
-                  Potion
+                  🧪 Potion
                 </button>
               </div>
 
-              <div className="mt-4 max-h-44 overflow-auto border border-gray-800 rounded-xl p-2 bg-black/20">
-                {match.state.log.slice(-20).map((l, i) => (
-                  <div key={i} className="text-[10px] text-gray-300">{l}</div>
-                ))}
-              </div>
+              {!isMyTurn && !match.state.finished && (
+                <div className="mt-2 text-center text-[10px] text-gray-500">Waiting for {match.state.turn.toUpperCase()}…</div>
+              )}
             </div>
           )}
         </>
