@@ -318,7 +318,15 @@ async function loadOwnedHeroes(){
   if(!addr) return { addr: null, heroes: [], err: 'no_wallet' };
 
   // Use Alchemy-backed wallet NFT lookup (fast, no log scans)
-  const owned = await fetch(`/api/wallet/heroes?owner=${encodeURIComponent(addr)}`, { cache:'no-store' })
+  // Prefer V3 (merge-enabled). Fallback to V2.
+  const ownedV3 = await fetch(`/api/wallet/heroes?owner=${encodeURIComponent(addr)}&contract=0x951144FAea2d756556e8cE6131FFd2038A6ae2D9`, { cache:'no-store' })
+    .then(r=>r.json())
+    .catch((e)=>({ error: String(e) }));
+  const owned = (Array.isArray(ownedV3?.tokenIds) && ownedV3.tokenIds.length)
+    ? ownedV3
+    : await fetch(`/api/wallet/heroes?owner=${encodeURIComponent(addr)}`, { cache:'no-store' })
+      .then(r=>r.json())
+      .catch((e)=>({ error: String(e) }));
     .then(r=>r.json())
     .catch((e)=>({ error: String(e) }));
 
@@ -332,7 +340,8 @@ async function loadOwnedHeroes(){
 
   const rows = await Promise.all(sample.map(async (id)=>{
     try{
-      const j = await fetch(`/api/nftv2/hero/${id}`, { cache:'no-store' }).then(r=>r.json());
+      const useV3 = (owned && owned.contract && String(owned.contract).toLowerCase() === '0x951144faea2d756556e8ce6131ffd2038a6ae2d9'.toLowerCase());
+      const j = await fetch(`${useV3?'/api/nftv3/hero/':'/api/nftv2/hero/'}${id}`, { cache:'no-store' }).then(r=>r.json());
       const h = j?.hero;
       if(!h) return null;
       const atk=Number(h.attack)||0;

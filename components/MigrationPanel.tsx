@@ -57,12 +57,12 @@ export default function MigrationPanel() {
     })()
   }, [])
 
-  const toClaim = useMemo(() => {
-    const s2 = new Set(v2)
-    return v1.filter((id) => !s2.has(id))
+  const toClaimV2 = useMemo(() => {
+    const s3 = new Set(v2)
+    return v1.filter((id) => !s3.has(id))
   }, [v1, v2])
 
-  const claimOne = async (tokenId: string) => {
+  const claimFrom = async (tokenId: string, from: "v1" | "v2") => {
     if (!HERO_PULL_V3_CONTRACT_ADDRESS) {
       alert("Missing V3 contract")
       return
@@ -75,12 +75,12 @@ export default function MigrationPanel() {
       if (!provider) throw new Error("No wallet provider")
 
       const accounts = await provider.request({ method: "eth_accounts" })
-      const from = accounts?.[0]
-      if (!from) throw new Error("Wallet not connected")
+      const fromAddr = accounts?.[0]
+      if (!fromAddr) throw new Error("Wallet not connected")
 
       const data = encodeFunctionData({
         abi: HERO_PULL_V3_ABI,
-        functionName: "claimFromV2",
+        functionName: from === "v1" ? "claimFromV1" : "claimFromV2",
         args: [BigInt(tokenId)],
       })
 
@@ -89,14 +89,14 @@ export default function MigrationPanel() {
         params: [
           {
             chainId: "0x2105",
-            from,
+            from: fromAddr,
             to: HERO_PULL_V3_CONTRACT_ADDRESS,
             data,
           },
         ],
       })
 
-      await refresh(from)
+      await refresh(fromAddr)
     } catch (e: any) {
       setErr(e?.message || String(e))
     } finally {
@@ -107,7 +107,7 @@ export default function MigrationPanel() {
   return (
     <div className="mt-6 border border-gray-800 bg-gray-900 rounded-2xl p-4">
       <div className="text-lg font-extrabold">Migration</div>
-      <div className="text-xs text-gray-400 mt-1">Move your V1 HERO NFTs into V2 (Dungeon uses V2).</div>
+      <div className="text-xs text-gray-400 mt-1">Migrate your HERO NFTs into V3 (needed for onchain merge).</div>
 
       <div className="mt-3 text-xs text-gray-500">
         Wallet: {address ? `${address.slice(0, 6)}…${address.slice(-4)}` : "(connect wallet)"}
@@ -115,16 +115,16 @@ export default function MigrationPanel() {
 
       {err && <div className="mt-3 text-xs text-red-400">{err}</div>}
 
-      <div className="mt-4 text-sm font-bold">To claim ({toClaim.length})</div>
-      {toClaim.length === 0 ? (
+      <div className="mt-4 text-sm font-bold">V2 → V3 to claim ({toClaimV2.length})</div>
+      {toClaimV2.length === 0 ? (
         <div className="text-sm text-gray-400 mt-2">Nothing to claim.</div>
       ) : (
         <div className="grid grid-cols-3 gap-2 mt-3">
-          {toClaim.slice(0, 30).map((id) => (
+          {toClaimV2.slice(0, 30).map((id) => (
             <button
               key={id}
               disabled={busy}
-              onClick={() => claimOne(id)}
+              onClick={() => claimFrom(id, "v2")}
               className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-xs py-2 rounded-xl"
             >
               Claim #{id}
@@ -137,6 +137,8 @@ export default function MigrationPanel() {
         V1: {HERO_PULL_V1_CONTRACT_ADDRESS}
         <br />
         V2: {HERO_PULL_V2_CONTRACT_ADDRESS ?? "(missing)"}
+        <br />
+        V3: {HERO_PULL_V3_CONTRACT_ADDRESS ?? "(missing)"}
       </div>
     </div>
   )

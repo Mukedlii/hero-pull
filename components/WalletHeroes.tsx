@@ -34,8 +34,15 @@ export function WalletHeroes({ onSelect }: { onSelect?: (hero: Hero & { tokenId?
         if (!addr) throw new Error("Wallet not connected")
         setWallet(addr)
 
-        const owned = await fetch(`/api/wallet/heroes?owner=${addr}`, { cache: "no-store" }).then((r) => r.json())
-        const tokenIds: string[] = Array.isArray(owned?.tokenIds) ? owned.tokenIds : []
+        const v2 = await fetch(`/api/wallet/heroes?owner=${addr}`, { cache: "no-store" }).then((r) => r.json())
+        const v3 = await fetch(`/api/wallet/heroes?owner=${addr}&contract=${encodeURIComponent("0x951144FAea2d756556e8cE6131FFd2038A6ae2D9")}`, { cache: "no-store" }).then((r) => r.json())
+
+        const tokenIdsV3: string[] = Array.isArray(v3?.tokenIds) ? v3.tokenIds : []
+        const tokenIdsV2: string[] = Array.isArray(v2?.tokenIds) ? v2.tokenIds : []
+
+        const useV3 = tokenIdsV3.length > 0
+        const tokenIds = useV3 ? tokenIdsV3 : tokenIdsV2
+
         if (!tokenIds.length) {
           setHeroes([])
           return
@@ -44,7 +51,8 @@ export function WalletHeroes({ onSelect }: { onSelect?: (hero: Hero & { tokenId?
         const rows = await Promise.all(
           tokenIds.map(async (id) => {
             try {
-              const j = await fetch(`/api/nftv2/hero/${id}`, { cache: "no-store" }).then((r) => r.json())
+              const url = useV3 ? `/api/nftv3/hero/${id}` : `/api/nftv2/hero/${id}`
+              const j = await fetch(url, { cache: "no-store" }).then((r) => r.json())
               return j?.hero ? ({ ...j.hero, tokenId: String(id) } as any) : null
             } catch {
               return null

@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
     const contract =
       (contractParam && contractParam.startsWith("0x") && contractParam.length === 42
         ? (contractParam as `0x${string}`)
-        : null) ?? (HERO_PULL_V3_CONTRACT_ADDRESS ?? HERO_PULL_V2_CONTRACT_ADDRESS)
+        : null) ?? (HERO_PULL_V2_CONTRACT_ADDRESS ?? HERO_PULL_V3_CONTRACT_ADDRESS)
     const url = `https://base-mainnet.g.alchemy.com/nft/v3/${key}/getNFTsForOwner?owner=${owner}&contractAddresses[]=${contract}&withMetadata=false&pageSize=100`
 
     const r = await fetch(url, { cache: "no-store" })
