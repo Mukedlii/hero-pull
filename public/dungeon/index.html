@@ -318,17 +318,28 @@ async function loadOwnedHeroes(){
   if(!addr) return { addr: null, heroes: [], err: 'no_wallet' };
 
   // Use Alchemy-backed wallet NFT lookup (fast, no log scans)
-  // Prefer V3 (merge-enabled). Fallback to V2.
-  const ownedV3 = await fetch(`/api/wallet/heroes?owner=${encodeURIComponent(addr)}&contract=0x951144FAea2d756556e8cE6131FFd2038A6ae2D9`, { cache:'no-store' })
+  // Prefer V4 (post-migration), then V3, then V2.
+  const ownedV4 = await fetch(`/api/wallet/heroes?owner=${encodeURIComponent(addr)}&contract=0x8967F143CD1Db88ec43A18d0b02ac769b05c844d`, { cache:'no-store' })
     .then(r=>r.json())
     .catch((e)=>({ error: String(e) }));
-  const owned = (Array.isArray(ownedV3?.tokenIds) && ownedV3.tokenIds.length)
-    ? ownedV3
+
+  const ownedV3 = (Array.isArray(ownedV4?.tokenIds) && ownedV4.tokenIds.length)
+    ? null
+    : await fetch(`/api/wallet/heroes?owner=${encodeURIComponent(addr)}&contract=0x951144FAea2d756556e8cE6131FFd2038A6ae2D9`, { cache:'no-store' })
+      .then(r=>r.json())
+      .catch((e)=>({ error: String(e) }));
+
+  const ownedV2 = (Array.isArray(ownedV4?.tokenIds) && ownedV4.tokenIds.length) || (Array.isArray(ownedV3?.tokenIds) && ownedV3.tokenIds.length)
+    ? null
     : await fetch(`/api/wallet/heroes?owner=${encodeURIComponent(addr)}`, { cache:'no-store' })
       .then(r=>r.json())
       .catch((e)=>({ error: String(e) }));
-    .then(r=>r.json())
-    .catch((e)=>({ error: String(e) }));
+
+  const owned = (Array.isArray(ownedV4?.tokenIds) && ownedV4.tokenIds.length)
+    ? ownedV4
+    : (Array.isArray(ownedV3?.tokenIds) && ownedV3.tokenIds.length)
+      ? ownedV3
+      : ownedV2;
 
   if(owned?.error) return { addr, heroes: [], err: owned.error };
 
@@ -340,8 +351,10 @@ async function loadOwnedHeroes(){
 
   const rows = await Promise.all(sample.map(async (id)=>{
     try{
-      const useV3 = (owned && owned.contract && String(owned.contract).toLowerCase() === '0x951144faea2d756556e8ce6131ffd2038a6ae2d9'.toLowerCase());
-      const j = await fetch(`${useV3?'/api/nftv3/hero/':'/api/nftv2/hero/'}${id}`, { cache:'no-store' }).then(r=>r.json());
+      const c = String(owned?.contract || '').toLowerCase();
+      const useV4 = c === '0x8967f143cd1db88ec43a18d0b02ac769b05c844d'.toLowerCase();
+      const useV3 = c === '0x951144faea2d756556e8ce6131ffd2038a6ae2d9'.toLowerCase();
+      const j = await fetch(`${useV4?'/api/nftv4/hero/':useV3?'/api/nftv3/hero/':'/api/nftv2/hero/'}${id}`, { cache:'no-store' }).then(r=>r.json());
       const h = j?.hero;
       if(!h) return null;
       const atk=Number(h.attack)||0;
