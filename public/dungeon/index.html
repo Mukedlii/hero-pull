@@ -327,10 +327,10 @@ async function loadOwnedHeroes(){
   const tokenIds = Array.isArray(owned?.tokenIds) ? owned.tokenIds : [];
   if(!tokenIds.length) return { addr, heroes: [], err: 'no_tokens' };
 
-  // Only fetch details for 3 random heroes (fast UI)
-  const shuffled = [...tokenIds].sort(()=>Math.random()-.5).slice(0,3);
+  // Fetch details for up to 10 heroes, then pick top 3 by rarity/level (fast enough with lookback)
+  const sample = [...tokenIds].slice(-10);
 
-  const rows = await Promise.all(shuffled.map(async (id)=>{
+  const rows = await Promise.all(sample.map(async (id)=>{
     try{
       const j = await fetch(`/api/nftv2/hero/${id}`, { cache:'no-store' }).then(r=>r.json());
       const h = j?.hero;
@@ -339,6 +339,7 @@ async function loadOwnedHeroes(){
       const def=Number(h.defense)||0;
       const spd=Number(h.speed)||0;
       const rarity=String(h.rarity||'common').toLowerCase();
+      const level=Number(h.level)||1;
       return {
         tokenId: String(id),
         name: h.name,
@@ -347,12 +348,20 @@ async function loadOwnedHeroes(){
         atk, def, spd,
         hp: hpFromStats(atk,def),
         power: h.power || '—',
+        level,
         color: rarityColor(rarity),
       };
     }catch{ return null; }
   }));
 
-  return { addr, heroes: rows.filter(Boolean), err: null };
+  const rank = (r)=> (r==='legendary'?3:r==='epic'?2:r==='rare'?1:0);
+  const best = rows.filter(Boolean).sort((a,b)=>{
+    const dr = rank(b.rarity)-rank(a.rarity);
+    if(dr!==0) return dr;
+    return (Number(b.level||1)-Number(a.level||1));
+  }).slice(0,3);
+
+  return { addr, heroes: best, err: null };
 }
 
 const HEROES = [
