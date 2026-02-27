@@ -56,20 +56,20 @@ const itemNames: Record<ItemSlot, Record<Exclude<ItemRarity, "Set">, string[]>> 
 
 // --- Sets ---
 
-type SetName = "Sunfire" | "Duskveil"
+type SetName = "Dragon" | "Shadow"
 
 const setPieces: Record<SetName, Record<ItemSlot, Omit<Item, "id" | "rarity" | "slot" | "set"> & { name: string }>> = {
-  Sunfire: {
-    weapon: { name: "Sunfire Blade", bonusATK: 60, bonusDEF: 10, bonusSPD: 10, imageEmoji: "🔥" },
-    shield: { name: "Sunfire Bulwark", bonusATK: 10, bonusDEF: 60, bonusSPD: 10, imageEmoji: "🔥" },
-    boots: { name: "Sunfire Striders", bonusATK: 10, bonusDEF: 10, bonusSPD: 60, imageEmoji: "🔥" },
-    helmet: { name: "Sunfire Crown", bonusATK: 25, bonusDEF: 25, bonusSPD: 25, imageEmoji: "🔥" },
+  Dragon: {
+    weapon: { name: "Dragonfang Blade", bonusATK: 65, bonusDEF: 10, bonusSPD: 10, imageEmoji: "🐉" },
+    shield: { name: "Dragonhide Aegis", bonusATK: 10, bonusDEF: 65, bonusSPD: 10, imageEmoji: "🐉" },
+    boots: { name: "Dragonstep Greaves", bonusATK: 10, bonusDEF: 10, bonusSPD: 65, imageEmoji: "🐉" },
+    helmet: { name: "Dragoncrest Helm", bonusATK: 25, bonusDEF: 25, bonusSPD: 25, imageEmoji: "🐉" },
   },
-  Duskveil: {
-    weapon: { name: "Duskveil Fang", bonusATK: 55, bonusDEF: 15, bonusSPD: 15, imageEmoji: "🌙" },
-    shield: { name: "Duskveil Guard", bonusATK: 15, bonusDEF: 55, bonusSPD: 15, imageEmoji: "🌙" },
-    boots: { name: "Duskveil Steps", bonusATK: 15, bonusDEF: 15, bonusSPD: 55, imageEmoji: "🌙" },
-    helmet: { name: "Duskveil Visor", bonusATK: 20, bonusDEF: 20, bonusSPD: 20, imageEmoji: "🌙" },
+  Shadow: {
+    weapon: { name: "Shadowbrand", bonusATK: 55, bonusDEF: 15, bonusSPD: 15, imageEmoji: "🕶️" },
+    shield: { name: "Shadowguard", bonusATK: 15, bonusDEF: 55, bonusSPD: 15, imageEmoji: "🕶️" },
+    boots: { name: "Shadowstride", bonusATK: 15, bonusDEF: 15, bonusSPD: 55, imageEmoji: "🕶️" },
+    helmet: { name: "Shadowveil Visor", bonusATK: 20, bonusDEF: 20, bonusSPD: 20, imageEmoji: "🕶️" },
   },
 }
 
