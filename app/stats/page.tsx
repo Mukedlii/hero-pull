@@ -69,35 +69,37 @@ export default function StatsPage() {
         </button>
       </div>
 
-      {tab === "migration" && <MigrationPanel />}
-      {tab === "stats" && (
-
-      <div className="mt-8 border border-gray-800 bg-gray-900 rounded-2xl p-5">
-        <div className="text-sm text-gray-400">Total Points</div>
-        <div className="text-4xl font-extrabold mt-1">{score ?? "…"}</div>
-        <div className="text-xs text-gray-500 mt-2">Battle scoring: Victory +5, Defeat -4 (never below 0).</div>
-        <div className="text-xs text-gray-500 mt-1">Saved server-side (Supabase) when available.</div>
-      </div>
-
-      {leaderboard.length > 0 && (
-        <div className="mt-6 border border-gray-800 bg-gray-900 rounded-2xl p-5">
-          <div className="text-sm text-gray-400">Leaderboard (Top 25)</div>
-          <div className="mt-3 flex flex-col gap-2">
-            {leaderboard.map((it, idx) => (
-              <div
-                key={it.fid}
-                className={`flex items-center justify-between text-sm ${fid === it.fid ? "text-yellow-300" : "text-gray-200"}`}
-              >
-                <div>
-                  #{idx + 1} • fid {it.fid}
-                </div>
-                <div className="font-bold">{it.score}</div>
-              </div>
-            ))}
+      {tab === "migration" ? (
+        <MigrationPanel />
+      ) : (
+        <>
+          <div className="mt-8 border border-gray-800 bg-gray-900 rounded-2xl p-5">
+            <div className="text-sm text-gray-400">Total Points</div>
+            <div className="text-4xl font-extrabold mt-1">{score ?? "…"}</div>
+            <div className="text-xs text-gray-500 mt-2">Battle scoring: Victory +5, Defeat -4 (never below 0).</div>
+            <div className="text-xs text-gray-500 mt-1">Saved server-side (Supabase) when available.</div>
           </div>
-        </div>
-      )}
-      )}
+
+          {leaderboard.length > 0 && (
+            <div className="mt-6 border border-gray-800 bg-gray-900 rounded-2xl p-5">
+              <div className="text-sm text-gray-400">Leaderboard (Top 25)</div>
+              <div className="mt-3 flex flex-col gap-2">
+                {leaderboard.map((it, idx) => (
+                  <div
+                    key={it.fid}
+                    className={`flex items-center justify-between text-sm ${fid === it.fid ? "text-yellow-300" : "text-gray-200"}`}
+                  >
+                    <div>
+                      #{idx + 1} • fid {it.fid}
+                    </div>
+                    <div className="font-bold">{it.score}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      )
     </div>
   )
 }
