@@ -3,10 +3,12 @@
 import { useEffect, useState } from "react"
 import { readScore } from "@/lib/score"
 import { getWalletAddress, loadStats } from "@/lib/db"
+import MigrationPanel from "@/components/MigrationPanel"
 
 type Item = { fid: number; score: number }
 
 export default function StatsPage() {
+  const [tab, setTab] = useState<"stats" | "migration">("stats")
   const [score, setScore] = useState<number | null>(null)
   const [fid, setFid] = useState<number | null>(null)
   const [leaderboard, setLeaderboard] = useState<Item[]>([])
@@ -52,6 +54,24 @@ export default function StatsPage() {
       <h1 className="text-2xl font-extrabold text-center mt-6">Stats</h1>
       <p className="text-center text-gray-400 mt-2 text-sm">Airdrop points</p>
 
+      <div className="mt-4 grid grid-cols-2 gap-2">
+        <button
+          onClick={() => setTab("stats")}
+          className={`py-2 rounded-xl text-xs font-bold border ${tab === "stats" ? "bg-purple-700 border-purple-500" : "bg-gray-900 border-gray-800"}`}
+        >
+          Stats
+        </button>
+        <button
+          onClick={() => setTab("migration")}
+          className={`py-2 rounded-xl text-xs font-bold border ${tab === "migration" ? "bg-purple-700 border-purple-500" : "bg-gray-900 border-gray-800"}`}
+        >
+          Migration
+        </button>
+      </div>
+
+      {tab === "migration" && <MigrationPanel />}
+      {tab === "stats" && (
+
       <div className="mt-8 border border-gray-800 bg-gray-900 rounded-2xl p-5">
         <div className="text-sm text-gray-400">Total Points</div>
         <div className="text-4xl font-extrabold mt-1">{score ?? "…"}</div>
@@ -76,6 +96,7 @@ export default function StatsPage() {
             ))}
           </div>
         </div>
+      )}
       )}
     </div>
   )
