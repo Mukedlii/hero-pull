@@ -139,31 +139,49 @@ export default function MigrationPanel() {
       {err && <div className="mt-3 text-xs text-red-400">{err}</div>}
 
       <div className="mt-4 text-sm font-bold">V1 → V4 to claim ({toClaimV1.length})</div>
-      <button
-        disabled={busy || toClaimV1.length === 0}
-        onClick={() => claimBatch(toClaimV1.slice(0, 50), "v1")}
-        className="mt-2 w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-xs py-2 rounded-xl"
-      >
-        Claim V1 → V4 (batch, max 50)
-      </button>
+      <div className="mt-2 grid grid-cols-4 gap-2">
+        {[1, 5, 10, 50].map((n) => (
+          <button
+            key={`v1-${n}`}
+            disabled={busy || toClaimV1.length === 0}
+            onClick={() => claimBatch(toClaimV1.slice(0, n), "v1")}
+            className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-xs py-2 rounded-xl"
+          >
+            {n === 50 ? "Claim max" : `Claim ${n}`}
+          </button>
+        ))}
+      </div>
+      <div className="mt-1 text-[10px] text-gray-500">Batch sizes: 1 / 5 / 10 / max 50</div>
 
       <div className="mt-4 text-sm font-bold">V2 → V4 to claim ({toClaimV2.length})</div>
-      <button
-        disabled={busy || toClaimV2.length === 0}
-        onClick={() => claimBatch(toClaimV2.slice(0, 50), "v2")}
-        className="mt-2 w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-xs py-2 rounded-xl"
-      >
-        Claim V2 → V4 (batch, max 50)
-      </button>
+      <div className="mt-2 grid grid-cols-4 gap-2">
+        {[1, 5, 10, 50].map((n) => (
+          <button
+            key={`v2-${n}`}
+            disabled={busy || toClaimV2.length === 0}
+            onClick={() => claimBatch(toClaimV2.slice(0, n), "v2")}
+            className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-xs py-2 rounded-xl"
+          >
+            {n === 50 ? "Claim max" : `Claim ${n}`}
+          </button>
+        ))}
+      </div>
+      <div className="mt-1 text-[10px] text-gray-500">Batch sizes: 1 / 5 / 10 / max 50</div>
 
       <div className="mt-4 text-sm font-bold">V3 → V4 to claim ({toClaimV3.length})</div>
-      <button
-        disabled={busy || toClaimV3.length === 0}
-        onClick={() => claimBatch(toClaimV3.slice(0, 50), "v3")}
-        className="mt-2 w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-xs py-2 rounded-xl"
-      >
-        Claim V3 → V4 (batch, max 50)
-      </button>
+      <div className="mt-2 grid grid-cols-4 gap-2">
+        {[1, 5, 10, 50].map((n) => (
+          <button
+            key={`v3-${n}`}
+            disabled={busy || toClaimV3.length === 0}
+            onClick={() => claimBatch(toClaimV3.slice(0, n), "v3")}
+            className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-xs py-2 rounded-xl"
+          >
+            {n === 50 ? "Claim max" : `Claim ${n}`}
+          </button>
+        ))}
+      </div>
+      <div className="mt-1 text-[10px] text-gray-500">Batch sizes: 1 / 5 / 10 / max 50</div>
 
       <div className="mt-5 text-[10px] text-gray-600 break-words">
         V1: {HERO_PULL_V1_CONTRACT_ADDRESS}
