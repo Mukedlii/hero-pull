@@ -153,6 +153,14 @@ export async function saveStats(
     highest_streak?: number
     current_streak?: number
     total_pulls?: number
+
+    // Dungeon progression (10 levels x 10 floors)
+    current_level?: number
+    current_floor?: number
+    highest_level_cleared?: number
+    highest_floor_cleared?: number
+    total_runs?: number
+    total_bosses?: number
   }
 ) {
   const { error } = await supabase().from("player_stats").upsert({

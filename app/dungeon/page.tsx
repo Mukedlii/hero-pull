@@ -253,7 +253,6 @@ export default function DungeonPage() {
       if (floor === 10) await bumpProgress({ highest_level_cleared: run.level, highest_floor_cleared: 10 })
       else await bumpProgress({ highest_level_cleared: run.level - 1, highest_floor_cleared: floor })
     }
-
   }
 
   async function doTreasure() {
@@ -451,7 +450,10 @@ export default function DungeonPage() {
                 ) : (
                   <div className="border border-gray-800 bg-black/20 rounded-xl p-3">
                     <div className="flex items-center justify-between text-sm text-gray-200">
-                      <div className="font-bold">{run.enemy.name}{run.enemy.isBoss ? " (BOSS)" : ""}</div>
+                      <div className="font-bold">
+                        {run.enemy.name}
+                        {run.enemy.isBoss ? " (BOSS)" : ""}
+                      </div>
                       <div className="text-xs text-gray-400">
                         HP {run.enemy.hp}/{run.enemy.maxHp}
                       </div>
@@ -481,9 +483,7 @@ export default function DungeonPage() {
               </div>
             )}
 
-            <div className="mt-4 text-[11px] text-gray-500 whitespace-pre-line">
-              {run.log.slice(-6).join("\n")}
-            </div>
+            <div className="mt-4 text-[11px] text-gray-500 whitespace-pre-line">{run.log.slice(-6).join("\n")}</div>
           </div>
 
           <div className="mt-3 grid grid-cols-2 gap-2">
@@ -499,12 +499,8 @@ export default function DungeonPage() {
         <>
           <div className="mt-6 border border-gray-800 bg-gray-900 rounded-2xl p-5">
             <div className="text-sm text-gray-400">Progress ({progressSource})</div>
-            <div className="mt-2 text-xs text-gray-300">
-              Current: Level {progress.current_level}, Floor {progress.current_floor}/10
-            </div>
-            <div className="mt-1 text-xs text-gray-300">
-              Highest cleared: Level {progress.highest_level_cleared}, Floor {progress.highest_floor_cleared}/10
-            </div>
+            <div className="mt-2 text-xs text-gray-300">Current: Level {progress.current_level}, Floor {progress.current_floor}/10</div>
+            <div className="mt-1 text-xs text-gray-300">Highest cleared: Level {progress.highest_level_cleared}, Floor {progress.highest_floor_cleared}/10</div>
             <div className="mt-1 text-xs text-gray-300">Runs: {progress.total_dungeon_runs} • Bosses: {progress.total_bosses_killed}</div>
           </div>
 

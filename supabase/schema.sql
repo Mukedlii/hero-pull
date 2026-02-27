@@ -47,3 +47,32 @@ create table if not exists public.pvp_matches (
 );
 
 create index if not exists pvp_matches_updated_idx on public.pvp_matches (updated_at desc);
+
+-- Wallet-based player stats (used for Arena + Dungeon)
+create table if not exists public.player_stats (
+  wallet_address text primary key,
+  points integer not null default 0,
+  wins integer not null default 0,
+  losses integer not null default 0,
+  highest_streak integer not null default 0,
+  current_streak integer not null default 0,
+  total_pulls integer not null default 0,
+
+  -- Dungeon progression
+  current_level integer not null default 1,
+  current_floor integer not null default 1,
+  highest_level_cleared integer not null default 0,
+  highest_floor_cleared integer not null default 0,
+  total_dungeon_runs integer not null default 0,
+  total_bosses_killed integer not null default 0,
+
+  updated_at timestamptz not null default now()
+);
+
+-- If the table already exists, ensure new columns are present.
+alter table public.player_stats add column if not exists current_level integer not null default 1;
+alter table public.player_stats add column if not exists current_floor integer not null default 1;
+alter table public.player_stats add column if not exists highest_level_cleared integer not null default 0;
+alter table public.player_stats add column if not exists highest_floor_cleared integer not null default 0;
+alter table public.player_stats add column if not exists total_dungeon_runs integer not null default 0;
+alter table public.player_stats add column if not exists total_bosses_killed integer not null default 0;

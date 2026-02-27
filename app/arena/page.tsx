@@ -31,7 +31,7 @@ export default function ArenaPage() {
           <div className="text-sm text-gray-400 mt-1">Fight rooms, loot, and bosses.</div>
 
           <div className="flex flex-col gap-2 mt-4">
-            <a href="/dungeon?v=1" className="bg-yellow-600 hover:bg-yellow-500 text-white text-sm font-bold py-3 rounded-xl text-center">
+            <a href="/dungeon?v=2" className="bg-yellow-600 hover:bg-yellow-500 text-white text-sm font-bold py-3 rounded-xl text-center">
               ▶ Start Dungeon
             </a>
             <a href="/collection?v=1" className="bg-gray-800 hover:bg-gray-700 text-white text-sm font-bold py-3 rounded-xl text-center">

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { readScore } from "@/lib/score"
 import { getWalletAddress, loadStats } from "@/lib/db"
+import { loadDungeonProgress, type DungeonProgress } from "@/lib/dungeonProgress"
 import MigrationPanel from "@/components/MigrationPanel"
 
 type Item = { fid: number; score: number }
@@ -12,9 +13,20 @@ export default function StatsPage() {
   const [score, setScore] = useState<number | null>(null)
   const [fid, setFid] = useState<number | null>(null)
   const [leaderboard, setLeaderboard] = useState<Item[]>([])
+  const [dungeon, setDungeon] = useState<DungeonProgress | null>(null)
+  const [dungeonSource, setDungeonSource] = useState<"supabase" | "local">("local")
 
   useEffect(() => {
     ;(async () => {
+      // 0) Dungeon progress (wallet → local fallback)
+      try {
+        const d = await loadDungeonProgress()
+        setDungeon(d.progress)
+        setDungeonSource(d.source)
+      } catch {
+        setDungeon(null)
+      }
+
       // 1) Always try to load leaderboard (fid-based)
       try {
         const lb = await fetch("/api/leaderboard?limit=25", { cache: "no-store" }).then((r) => r.json())
@@ -54,6 +66,15 @@ export default function StatsPage() {
         // ignore
       }
 
+      // Dungeon progress (wallet->supabase if available, else local)
+      try {
+        const dp = await loadDungeonProgress()
+        setDungeon(dp.progress)
+        setDungeonSource(dp.source)
+      } catch {
+        setDungeon(null)
+      }
+
       // Choose best available
       if (walletPoints != null) setScore(walletPoints)
       else if (fidPoints != null) setScore(fidPoints)
@@ -90,6 +111,26 @@ export default function StatsPage() {
             <div className="text-4xl font-extrabold mt-1">{score ?? "…"}</div>
             <div className="text-xs text-gray-500 mt-2">Battle scoring: Victory +5, Defeat -4 (never below 0).</div>
             <div className="text-xs text-gray-500 mt-1">Saved server-side (Supabase) when available.</div>
+          </div>
+
+          <div className="mt-6 border border-gray-800 bg-gray-900 rounded-2xl p-5">
+            <div className="text-sm text-gray-400">Dungeon Progress ({dungeonSource})</div>
+            {dungeon ? (
+              <div className="mt-2 text-sm text-gray-200 space-y-1">
+                <div>
+                  Current: <span className="font-bold">Level {dungeon.current_level}</span> • Floor {dungeon.current_floor}/10
+                </div>
+                <div>
+                  Highest cleared: <span className="font-bold">Level {dungeon.highest_level_cleared}</span> • Floor {dungeon.highest_floor_cleared}/10
+                </div>
+                <div className="text-xs text-gray-400">Runs: {dungeon.total_dungeon_runs} • Bosses: {dungeon.total_bosses_killed}</div>
+              </div>
+            ) : (
+              <div className="mt-2 text-sm text-gray-500">…</div>
+            )}
+            <a href="/dungeon?v=2" className="mt-4 block bg-yellow-600 hover:bg-yellow-500 text-white text-sm font-bold py-3 rounded-xl text-center">
+              Open Dungeon
+            </a>
           </div>
 
           {leaderboard.length > 0 && (
