@@ -104,19 +104,11 @@ export default function BattlePage() {
     window.open(url, "_blank")
   }
 
-  if (!hero) {
-    return (
-      <div className="px-4 pb-24">
-        <h1 className="text-2xl font-extrabold text-center mt-6">Battle</h1>
-        <p className="text-center text-gray-400 mt-4">Choose a hero first!</p>
-        <div className="flex justify-center mt-6">
-          <a href="/collection" className="bg-purple-700 hover:bg-purple-600 text-white py-2 px-4 rounded-lg">
-            Go to My Heroes
-          </a>
-        </div>
-      </div>
-    )
+  // Battle is deprecated. Keep route for old links.
+  if (typeof window !== "undefined") {
+    window.location.href = "/arena"
   }
+  return null
 
   if (!opponent) return null
 

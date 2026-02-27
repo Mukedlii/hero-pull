@@ -34,9 +34,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <span className="text-2xl">🏠</span>
               <span className="text-xs mt-1">Home</span>
             </a>
-            <a href="/battle" className="flex flex-col items-center text-red-400 hover:text-red-300">
+            <a href="/arena" className="flex flex-col items-center text-red-400 hover:text-red-300">
               <span className="text-2xl">⚔️</span>
-              <span className="text-xs mt-1">Battle</span>
+              <span className="text-xs mt-1">Arena</span>
             </a>
             <a href="/collection" className="flex flex-col items-center text-purple-400 hover:text-purple-300">
               <span className="text-2xl">🦸</span>
