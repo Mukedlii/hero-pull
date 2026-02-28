@@ -516,7 +516,7 @@ export default function DungeonPage() {
       if (roll < 0.4) {
         const g = clampInt(randInt(levelCfg.treasureGold[0], levelCfg.treasureGold[1]) + floor * 2, 0, 999999)
         setRunGold((x) => x + g)
-        setRunScore((s) => s + 25 + level * 2)
+        awardScore(25 + level * 2)
         try {
           const baseGold = loadGold()
           saveGold(baseGold + g)
@@ -527,7 +527,7 @@ export default function DungeonPage() {
       } else if (roll < 0.72) {
         const heal = Math.floor(playerMaxHp * 0.42)
         setPlayerHp((hp) => Math.min(playerMaxHp, hp + heal))
-        setRunScore((s) => s + 20 + level)
+        awardScore(20 + level)
         appendLog(`💎 Healing crystal: +${heal} HP.`)
       } else {
         const it = generateDropForDepth(depth)
@@ -617,7 +617,7 @@ export default function DungeonPage() {
     const goldMultiplier = 1 + (eff.total.lck / 50) * 0.05
     const gold = clampInt(Math.floor(goldBase * goldMultiplier), 0, 999999)
 
-    setRunScore((s) => s + pts)
+    awardScore(pts)
     setRunGold((g) => g + gold)
 
     // Bank a bit of gold immediately so even short runs feel rewarding.
@@ -789,6 +789,24 @@ export default function DungeonPage() {
     setTimeout(() => setLootFx(""), 900)
   }
 
+  const awardScore = (delta: number) => {
+    const d = clampInt(delta, 0, 999999)
+    if (!d) return
+    setRunScore((s) => s + d)
+    // Persist to Stats immediately so airdrop points track live.
+    addPoints(d).catch(() => {})
+  }
+
+  const shopItemCost = (it: Item) => {
+    // deterministic-ish cost: scales with rarity + depth; stable per item id
+    const base = it.rarity === "Common" ? 45 : it.rarity === "Rare" ? 90 : it.rarity === "Epic" ? 155 : it.rarity === "Legendary" ? 240 : 280
+    const id = String(it.id || "")
+    let h = 0
+    for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0
+    const jitter = h % 19 // 0..18
+    return clampInt(base + Math.floor(depth * 0.6) + jitter, 1, 999999)
+  }
+
   const equipItem = (it: Item) => {
     const next = { ...equipped, [it.slot]: it }
     setEquipped(next)
@@ -809,9 +827,7 @@ export default function DungeonPage() {
   }
 
   const buyShopItem = async (it: Item) => {
-    // Prices scale with rarity + depth
-    const base = it.rarity === "Common" ? 45 : it.rarity === "Rare" ? 90 : it.rarity === "Epic" ? 155 : it.rarity === "Legendary" ? 240 : 280
-    const cost = clampInt(base + Math.floor(depth * 0.6) + Math.floor(Math.random() * 18), 1, 999999)
+    const cost = shopItemCost(it)
 
     const currentGold = loadGold()
     if (currentGold < cost) {
@@ -851,7 +867,7 @@ export default function DungeonPage() {
       const heal = Math.floor(playerMaxHp * 0.2)
       setPlayerHp((hp) => Math.min(playerMaxHp, hp + heal))
       setMp((m) => Math.min(50, m + 20))
-      setRunScore((s) => s + 120)
+      awardScore(120)
 
       appendLog(`➡️ Level ${nextLevel} begins. (+${heal} HP, +20 MP)`)
 
@@ -866,7 +882,7 @@ export default function DungeonPage() {
     const heal = Math.floor(playerMaxHp * 0.12)
     setPlayerHp((hp) => Math.min(playerMaxHp, hp + heal))
     setMp((m) => Math.min(50, m + 12))
-    setRunScore((s) => s + 45)
+    awardScore(45)
 
     const nf = floor + 1
     setFloor(nf)
@@ -892,11 +908,9 @@ export default function DungeonPage() {
 
     // Gold is banked immediately on wins/treasure so runs always feel rewarding.
 
-    // final points
+    // final points (bonus only; per-room score is persisted live)
     const bonus = victory ? 1000 : 0
-    const finalScore = runScore + bonus
-    setRunScore(finalScore)
-    await addPoints(finalScore)
+    if (bonus) awardScore(bonus)
 
     if (victory) {
       // if full game victory, mark progress fully cleared
@@ -915,7 +929,7 @@ export default function DungeonPage() {
   const doTrapDisarm = () => {
     const ok = Math.random() < 0.55
     if (ok) {
-      setRunScore((s) => s + 30 + level)
+      awardScore(30 + level)
       setRunGold((g) => g + 12 + level)
       appendLog("✅ Disarmed! +score +gold.")
     } else {
@@ -955,7 +969,7 @@ export default function DungeonPage() {
           }),
       },
       { name: "Gold Rain", fn: () => setRunGold((g) => g + 60 + level * 5) },
-      { name: "Score Blessing", fn: () => setRunScore((s) => s + 80 + level * 10) },
+      { name: "Score Blessing", fn: () => awardScore(80 + level * 10) },
     ]
 
     const b = blessings[Math.floor(Math.random() * blessings.length)]!
@@ -1297,7 +1311,7 @@ export default function DungeonPage() {
 
           {room === "shop" ? (
             <div className="mt-3">
-              <div className="text-xs text-gray-400">Buys spend your wallet gold (hero-pull-gold) and save items to inventory.</div>
+              <div className="text-xs text-gray-400">Buys spend your wallet gold (hero-pull-gold) and save items to inventory. Wallet: 🪙 {loadGold()}</div>
               <div className="mt-3 grid grid-cols-1 gap-2">
                 {shopItems.map((it) => (
                   <div key={it.id} className={`border-2 rounded-xl p-3 bg-gray-950/30 ${rarityBorder(it.rarity)}`}>
@@ -1307,7 +1321,10 @@ export default function DungeonPage() {
                         <div className="text-[11px] text-gray-400">{it.rarity} • {slotLabel(it.slot)}{it.set ? ` • Set ${it.set}` : ""}</div>
                         <div className="text-[11px] text-gray-300 mt-1">+{it.bonusPWR} PWR • +{it.bonusDEF} DEF • +{it.bonusLCK} LCK</div>
                       </div>
-                      <button disabled={busy} onClick={() => buyShopItem(it).catch(() => {})} className="bg-yellow-600 hover:bg-yellow-500 disabled:opacity-50 text-white font-extrabold py-2 px-3 rounded-xl text-xs">Buy</button>
+                      <div className="text-right">
+                        <div className="text-[11px] text-yellow-300 font-extrabold">🪙 {shopItemCost(it)}</div>
+                        <button disabled={busy} onClick={() => buyShopItem(it).catch(() => {})} className="mt-1 bg-yellow-600 hover:bg-yellow-500 disabled:opacity-50 text-white font-extrabold py-2 px-3 rounded-xl text-xs">Buy</button>
+                      </div>
                     </div>
                   </div>
                 ))}
