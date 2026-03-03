@@ -33,8 +33,6 @@ export default function Page() {
 
   return (
     <main className="w-full max-w-md mx-auto">
-      <h1 className="text-3xl font-extrabold text-center mt-6">Hero Pull</h1>
-      <p className="text-center text-gray-400 mt-2">Test your luck and mint a unique superhero!</p>
       <HeroPull />
     </main>
   )
