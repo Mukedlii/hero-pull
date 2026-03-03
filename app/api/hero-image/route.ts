@@ -46,18 +46,19 @@ export async function GET(req: NextRequest) {
     if (ovr) {
       const ovrPath = path.join(layersDir, "overlays", `${ovr}.png`)
       if (fs.existsSync(ovrPath)) {
-        const ovrSize = Math.round(SIZE * 0.55)
-        const ovrOffset = Math.round((SIZE - ovrSize) / 2)
+        // Overlays are authored to align with the full 1:1 canvas.
+        // Resizing them smaller + centering can cause "double face"/smearing artifacts on mobile.
         const resized = await sharp(ovrPath)
-          .resize(ovrSize, ovrSize, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
+          .resize(SIZE, SIZE, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
           .toBuffer()
-        overlays.push({ input: resized, top: ovrOffset, left: ovrOffset })
+        overlays.push({ input: resized, top: 0, left: 0 })
       }
     }
 
     const result = await sharp(bgBuffer)
       .composite(overlays)
-      .png({ quality: 85 })
+      // PNG ignores "quality" (that's for JPEG/WebP). Keep output deterministic.
+      .png()
       .toBuffer()
 
     return new NextResponse(result, {
