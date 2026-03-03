@@ -92,6 +92,7 @@ function pickDragonSetPiece(): Item {
     bonusDEF: slot === "weapon" ? 20 : slot === "shield" ? 120 : slot === "boots" ? 20 : 60,
     bonusLCK: slot === "weapon" ? 20 : slot === "shield" ? 20 : slot === "boots" ? 120 : 60,
     imageEmoji: "🐉",
+    imageUrl: `/items/${slot}_set_dragon.png`,
     set: "Dragon",
   }
 }
@@ -260,7 +261,7 @@ export default function ShopPage() {
           <div className="grid grid-cols-2 gap-3 mt-4">
             {goldItems.map((t) => (
               <div key={t.templateId} className={`border-2 rounded-2xl p-3 bg-gray-900 ${rarityBorder(t.rarity)}`}>
-                <div className="text-3xl">{t.imageEmoji}</div>
+                {t.imageUrl ? <img src={t.imageUrl} alt={t.name} className="w-12 h-12 object-contain" /> : <div className="text-3xl">{t.imageEmoji}</div>}
                 <div className="font-bold text-sm mt-1 leading-tight">{t.name}</div>
                 <div className="text-xs text-gray-400">{t.rarity} • {t.slot.toUpperCase()}</div>
                 <div className="text-xs mt-2">+{t.bonusPWR} PWR • +{t.bonusDEF} DEF • +{t.bonusLCK} LCK</div>

@@ -1,5 +1,3 @@
 {
-  "rewrites": [
-    { "source": "/dungeon", "destination": "/dungeon/index.html" }
-  ]
+  "framework": "nextjs"
 }

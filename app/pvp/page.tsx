@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useSearchParams } from "next/navigation"
+import LoadingDots from "@/components/LoadingDots"
 import { supabase } from "@/lib/supabase"
 import { getWalletAddress } from "@/lib/db"
 import type { Hero } from "@/lib/heroes"
@@ -149,6 +150,55 @@ export default function PvPPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [match?.state?.turnEndsAt, isMyTurn])
 
+  const findMatch = async () => {
+    if (!wallet) return
+    setBusy(true)
+    setErr("")
+    try {
+      // Look for an open lobby where we are not p1
+      const { data, error } = await supabase()
+        .from("pvp_matches")
+        .select("*")
+        .eq("status", "lobby")
+        .is("p2_wallet", null)
+        .neq("p1_wallet", wallet)
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (error && error.code !== 'PGRST116') throw error
+
+      if (data) {
+        // Found a match, let's join it
+        const { error: joinError } = await supabase()
+          .from("pvp_matches")
+          .update({ p2_wallet: wallet })
+          .eq("id", data.id)
+        
+        if (joinError) throw joinError
+        window.location.href = `/pvp?m=${data.id}`
+      } else {
+        // Create new match
+        const id = crypto.randomUUID()
+        const { error: createError } = await supabase().from("pvp_matches").insert({
+          id,
+          status: "lobby",
+          p1_wallet: wallet,
+          p2_wallet: null,
+          p1_hero: null,
+          p2_hero: null,
+          state: null,
+        })
+        if (createError) throw createError
+        window.location.href = `/pvp?m=${id}`
+      }
+    } catch (e: any) {
+      setErr(e?.message || String(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const createMatch = async () => {
     if (!wallet) return
     setBusy(true)
@@ -268,10 +318,24 @@ export default function PvPPage() {
         <div className="mt-6 flex flex-col gap-3">
           <button
             disabled={!wallet || busy}
+            onClick={() => findMatch().catch(() => {})}
+            className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold py-3 rounded-xl"
+          >
+            Find Match
+          </button>
+          
+          <div className="flex items-center justify-center gap-2 mt-2">
+            <div className="h-[1px] bg-gray-800 flex-1"></div>
+            <span className="text-xs text-gray-500">OR</span>
+            <div className="h-[1px] bg-gray-800 flex-1"></div>
+          </div>
+
+          <button
+            disabled={!wallet || busy}
             onClick={() => createMatch().catch(() => {})}
             className="w-full bg-purple-700 hover:bg-purple-600 disabled:opacity-50 text-white font-bold py-3 rounded-xl"
           >
-            Create match
+            Create private match
           </button>
           <div className="text-center text-xs text-gray-500">Open the link you get and share it.</div>
         </div>
@@ -288,7 +352,7 @@ export default function PvPPage() {
       {err && <div className="mt-3 text-center text-xs text-red-400">{err}</div>}
 
       {!match ? (
-        <div className="mt-8 text-center text-gray-400 text-sm">Loading…</div>
+        <LoadingDots text="Loading match..." />
       ) : (
         <>
           {!role && (

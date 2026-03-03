@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { coerceHero, type Hero } from "@/lib/heroes"
+import LoadingDots from "@/components/LoadingDots"
 import type { Item, ItemRarity, ItemSlot } from "@/lib/items"
 import { getEquippedBonuses, getSetBonus } from "@/lib/items"
 import { loadInventory } from "@/lib/inventory"
@@ -274,7 +275,7 @@ export function HeroesMasterDetail() {
     }
   }
 
-  if (loading) return <div className="text-xs text-gray-400 text-center mt-6">Loading…</div>
+  if (loading) return <LoadingDots text="Loading heroes..." />
   if (err) return <div className="text-xs text-red-400 text-center mt-6">{err}</div>
 
   if (!selected) {
@@ -410,7 +411,7 @@ export function HeroesMasterDetail() {
                     <div className="text-[11px] text-gray-400 font-bold">{slotLabel(slot)}</div>
                     {it ? (
                       <div className="text-[11px] text-gray-200 mt-1">
-                        {it.imageEmoji} {it.name}
+                        {it.imageUrl ? <img src={it.imageUrl} alt={it.name} className="inline w-4 h-4 object-contain mr-1" /> : it.imageEmoji} {it.name}
                         {it.set ? <span className="text-[#f97316]"> ({it.set})</span> : null}
                       </div>
                     ) : (
@@ -436,7 +437,7 @@ export function HeroesMasterDetail() {
                     onClick={() => setEquipPending({ item: it, slot: it.slot })}
                     className={`border-2 rounded-xl p-3 bg-gray-950/30 text-left ${itemBorder[it.rarity]}`}
                   >
-                    <div className="text-2xl">{it.imageEmoji}</div>
+                    {it.imageUrl ? <img src={it.imageUrl} alt={it.name} className="w-10 h-10 object-contain" /> : <div className="text-2xl">{it.imageEmoji}</div>}
                     <div className="text-xs font-bold mt-1 leading-tight">{it.name}</div>
                     <div className="text-[10px] text-gray-400">{it.rarity} • {it.slot.toUpperCase()}</div>
                     <div className="text-[10px] text-gray-300 mt-1">+{it.bonusPWR} PWR • +{it.bonusDEF} DEF • +{it.bonusLCK} LCK</div>
@@ -483,7 +484,7 @@ export function HeroesMasterDetail() {
               <div className={`border-2 rounded-2xl p-3 bg-gray-900 ${itemBorder[equipPending.item.rarity]}`}>
                 <div className="text-xs text-gray-200 font-bold">New item</div>
                 <div className="mt-2 text-xs">
-                  <div className="font-bold">{equipPending.item.imageEmoji} {equipPending.item.name}</div>
+                  <div className="font-bold flex items-center gap-1">{equipPending.item.imageUrl ? <img src={equipPending.item.imageUrl} alt={equipPending.item.name} className="w-5 h-5 object-contain" /> : equipPending.item.imageEmoji} {equipPending.item.name}</div>
                   <div className="text-gray-300">
                     +{equipPending.item.bonusPWR} PWR • +{equipPending.item.bonusDEF} DEF • +{equipPending.item.bonusLCK} LCK
                   </div>

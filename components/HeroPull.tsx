@@ -42,7 +42,7 @@ export default function HeroPull() {
 
   const handleShare = async () => {
     if (!hero) return
-    const text = `I pulled a ${hero.rarity} hero in Hero Pull! ⚔️\n\n${hero.name} ⚡️ Power: ${hero.power}\n\nPlay here 👇`
+    const text = `I pulled a ${hero.rarity} hero in Hero Pull! ⚔️\n\n${hero.name}\n❤️${hero.health} ⚔️${hero.power} 🛡️${hero.defense} 🍀${hero.luck}\n\nPlay here 👇`
     const frameUrl = 'https://hero-pull.vercel.app'
     const url = `https://warpcast.com/~/compose?text=${encodeURIComponent(text)}&embeds[]=${encodeURIComponent(frameUrl)}`
 
@@ -126,9 +126,14 @@ export default function HeroPull() {
               e.currentTarget.src = `https://api.dicebear.com/7.x/adventurer/svg?seed=${seed}`
             }}
           />
-          <h2 className="text-2xl font-extrabold mb-1">{hero.name}</h2>
-          <p className="text-gray-300 text-sm">Power: {hero.power}</p>
-          <p className="text-gray-400 text-xs mt-1">{hero.gender}</p>
+          <h2 className="text-2xl font-extrabold mb-2">{hero.name}</h2>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm mx-auto w-fit">
+            <div className="text-left"><span className="text-red-400">❤️</span> HP: <span className="font-bold text-white">{hero.health}</span></div>
+            <div className="text-left"><span className="text-orange-400">⚔️</span> PWR: <span className="font-bold text-white">{hero.power}</span></div>
+            <div className="text-left"><span className="text-blue-400">🛡️</span> DEF: <span className="font-bold text-white">{hero.defense}</span></div>
+            <div className="text-left"><span className="text-green-400">🍀</span> LCK: <span className="font-bold text-white">{hero.luck}</span></div>
+          </div>
+          <p className="text-gray-400 text-xs mt-2">{hero.gender} • {hero.ability}</p>
           {hero.rarity === 'Legendary' && (
             <p className="text-yellow-400 text-xs font-bold mt-2 animate-pulse">
               LEGENDARY! Mint this as NFT!

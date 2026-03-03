@@ -1,22 +1,25 @@
 #!/usr/bin/env python3
-"""Generate layered Hero NFTs (PNG + metadata) with Tier system.
+"""Generate layered Hero NFTs using the public/layers/ assets.
 
-Inputs: a folder with the ZIP contents (assets/ + config/rarity.json).
+This script composites hero images from the layer system:
+  - backgrounds/ (rarity-based: bg_common, bg_rare, bg_epic, bg_legendary)
+  - body/ (body_male_1, body_male_2, body_female_1, body_female_2)
+  - eyes/ (eyes_fierce, eyes_wise, eyes_mystic, eyes_shadow, eyes_divine)
+  - mouth/ (mouth_stern, mouth_smirk, mouth_fierce, mouth_calm, mouth_sinister)
+  - hair/ (hair_long_black, hair_long_silver, hair_long_red, hair_long_blue,
+           hair_short_brown, hair_short_blonde, hair_short_purple,
+           hair_mohawk_green, hair_bald_runes, hair_braided_dark)
+  - accessories/ (acc_pauldrons, acc_amulet, acc_hood, acc_scars, acc_crown,
+                   acc_runes, acc_eyepatch)
 
-Usage (example):
+Usage:
   pip install pillow
-  python scripts/generate_heroes.py --src C:/path/to/zip-root --count 5000 --out ./generated
+  python scripts/generate_heroes.py --count 100 --out ./generated
 
 Output:
   generated/images/hero_00001.png
   generated/metadata/hero_00001.json
   generated/index.csv
-
-Tier odds & bonuses (default):
-  Common 60%  (no bonus)
-  Rare 25%    (+5% power)
-  Epic 10%    (+10% power)
-  Legendary 5%(+20% power)
 """
 
 import argparse
@@ -30,7 +33,9 @@ from pathlib import Path
 
 from PIL import Image
 
-W = H = 1024
+W = H = 512
+
+LAYERS_DIR = Path(__file__).resolve().parent.parent / "public" / "layers"
 
 
 @dataclass(frozen=True)
@@ -44,8 +49,37 @@ class Tier:
 TIERS = [
     Tier("Common", 0.60, "#9ca3af", 0.00),
     Tier("Rare", 0.25, "#60a5fa", 0.05),
-    Tier("Epic", 0.10, "#c084fc", 0.10),
-    Tier("Legendary", 0.05, "#ffd700", 0.20),
+    Tier("Epic", 0.12, "#c084fc", 0.10),
+    Tier("Legendary", 0.03, "#ffd700", 0.20),
+]
+
+CHARS = [
+    "char_warrior_m", "char_mage_m", "char_warrior_f", "char_mage_f",
+    "char_rogue_m", "char_ranger_f", "char_paladin_m", "char_necro_f",
+    "char_berserker_m", "char_cleric_f", "char_darkknight_m", "char_monk_f",
+]
+OVERLAYS = [
+    "ovr_pauldrons", "ovr_amulet", "ovr_hood", "ovr_scars",
+    "ovr_crown", "ovr_runes", "ovr_eyepatch",
+]
+
+BG_MAP = {
+    "Common": "bg_common",
+    "Rare": "bg_rare",
+    "Epic": "bg_epic",
+    "Legendary": "bg_legendary",
+}
+
+NAME_PREFIXES = {
+    "Common": ["Rookie", "Novice", "Young", "Wandering", "Simple", "Local", "Town", "Green", "Fresh"],
+    "Rare": ["Skilled", "Adept", "Swift", "Brave", "Fierce", "Noble", "Silver", "Iron", "Storm"],
+    "Epic": ["Master", "Elite", "Grand", "Shadow", "Crimson", "Phantom", "Mystic", "Radiant", "Thunder"],
+    "Legendary": ["Divine", "Godly", "Cosmic", "Astral", "Supreme", "Immortal", "Abyssal", "Celestial", "Mythic"],
+}
+
+NAME_SUFFIXES = [
+    "Fighter", "Warrior", "Knight", "Ranger", "Mage", "Paladin", "Rogue",
+    "Defender", "Champion", "Sentinel", "Guardian", "Striker", "Blade",
 ]
 
 
@@ -59,58 +93,48 @@ def roll_tier(rng: random.Random) -> Tier:
     return TIERS[-1]
 
 
-def weighted_choice(d: dict, rng: random.Random) -> str:
-    items = list(d.items())
-    total = sum(float(w) for _, w in items)
-    r = rng.uniform(0, total)
-    for k, w in items:
-        w = float(w)
-        if r < w:
-            return k
-        r -= w
-    return items[-1][0]
+def generate_name(tier: Tier, rng: random.Random) -> str:
+    prefix = rng.choice(NAME_PREFIXES[tier.name])
+    suffix = rng.choice(NAME_SUFFIXES)
+    return f"{prefix} {suffix}"
 
 
 def sha_seed(s: str) -> int:
-    # deterministic seed from string
     h = hashlib.sha256(s.encode("utf-8")).digest()
     return int.from_bytes(h[:8], "big", signed=False)
 
 
-def ensure_file(p: Path):
+def load_layer(category: str, name: str) -> Image.Image:
+    p = LAYERS_DIR / category / f"{name}.png"
     if not p.exists():
-        raise FileNotFoundError(str(p))
+        raise FileNotFoundError(f"Layer not found: {p}")
+    return Image.open(p).convert("RGBA").resize((W, H), Image.LANCZOS)
+
+
+def composite_hero(tier: Tier, char: str, overlay: str | None) -> Image.Image:
+    bg_name = BG_MAP[tier.name]
+    img = load_layer("backgrounds", bg_name)
+
+    char_layer = load_layer("chars", char)
+    img.alpha_composite(char_layer)
+
+    if overlay:
+        ovr_layer = load_layer("overlays", overlay)
+        img.alpha_composite(ovr_layer)
+
+    return img
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--src", type=str, required=True, help="Root folder containing assets/ and config/")
     ap.add_argument("--count", type=int, default=100)
     ap.add_argument("--out", type=str, default="generated")
-    ap.add_argument("--rarity", type=str, default="config/rarity.json")
     ap.add_argument("--collection", type=str, default="Hero Pull Heroes")
     ap.add_argument("--description", type=str, default="Hero Pull — generated layered heroes with tier rarity.")
-    ap.add_argument(
-        "--image-base",
-        type=str,
-        default="ipfs://REPLACE_ME/",
-        help="Base URI for image field, e.g. ipfs://CID/ or https://.../images/",
-    )
+    ap.add_argument("--image-base", type=str, default="ipfs://REPLACE_ME/")
     ap.add_argument("--start-id", type=int, default=1)
-    ap.add_argument(
-        "--seed",
-        type=str,
-        default="hero-pull",
-        help="Global seed (string). Same inputs => same outputs.",
-    )
+    ap.add_argument("--seed", type=str, default="hero-pull")
     args = ap.parse_args()
-
-    src = Path(args.src)
-    assets = src / "assets"
-    rarity_path = src / args.rarity
-    ensure_file(rarity_path)
-
-    rarity = json.loads(rarity_path.read_text(encoding="utf-8"))
 
     out = Path(args.out)
     out_images = out / "images"
@@ -118,60 +142,26 @@ def main():
     out_images.mkdir(parents=True, exist_ok=True)
     out_meta.mkdir(parents=True, exist_ok=True)
 
-    # CSV index
     csv_path = out / "index.csv"
     csv_f = csv_path.open("w", newline="", encoding="utf-8")
     writer = csv.writer(csv_f)
-    writer.writerow(
-        [
-            "token_id",
-            "file",
-            "tier",
-            "power",
-            "skin",
-            "hair_style",
-            "hair_color",
-            "eyes_style",
-            "eyes_color",
-            "mouth",
-            "item",
-        ]
-    )
+    writer.writerow([
+        "token_id", "file", "tier", "power", "name",
+        "char", "overlay",
+    ])
 
     try:
         for n in range(args.count):
             token_id = args.start_id + n
             token_str = str(token_id).zfill(5)
-
-            # Deterministic per-token RNG
             rng = random.Random(sha_seed(f"{args.seed}:{token_id}"))
 
             tier = roll_tier(rng)
+            char = rng.choice(CHARS)
+            overlay = rng.choice(OVERLAYS) if rng.random() < 0.5 else None
 
-            # Use rarity weights exactly as provided in the ZIP (config/rarity.json)
-            skin = weighted_choice(rarity["base"], rng)
-            hair_style = weighted_choice(rarity["hair_style"], rng)
-            hair_color = weighted_choice(rarity["hair_color"], rng)
-            eyes_style = weighted_choice(rarity["eyes_style"], rng)
-            eyes_color = weighted_choice(rarity["eyes_color"], rng)
-            mouth = weighted_choice(rarity["mouth"], rng)
-            item = weighted_choice(rarity["item"], rng)
+            img = composite_hero(tier, char, overlay)
 
-            layers = [
-                assets / "base" / f"{skin}.png",
-                assets / "hair" / f"{hair_style}_{hair_color}.png",
-                assets / "eyes" / f"{eyes_style}_{eyes_color}.png",
-                assets / "mouth" / f"{mouth}.png",
-                assets / "items" / f"{item}.png",
-            ]
-            for p in layers:
-                ensure_file(p)
-
-            img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-            for p in layers:
-                img.alpha_composite(Image.open(p).convert("RGBA"))
-
-            # Gameplay stat: power
             base_power = rng.randint(80, 120)
             power = int(round(base_power * (1.0 + tier.power_bonus_pct)))
 
@@ -180,42 +170,32 @@ def main():
 
             img.save(out_images / file_name, "PNG", optimize=True)
 
+            name = generate_name(tier, rng)
+
             meta = {
-                "name": f"{args.collection} #{token_id}",
+                "name": name,
                 "description": args.description,
                 "image": f"{args.image_base}{file_name}",
                 "attributes": [
                     {"trait_type": "Tier", "value": tier.name},
                     {"trait_type": "Tier Color", "value": tier.color},
                     {"trait_type": "Power", "value": power},
-                    {"trait_type": "Skin", "value": skin},
-                    {"trait_type": "Hair Style", "value": hair_style},
-                    {"trait_type": "Hair Color", "value": hair_color},
-                    {"trait_type": "Eyes Style", "value": eyes_style},
-                    {"trait_type": "Eyes Color", "value": eyes_color},
-                    {"trait_type": "Mouth", "value": mouth},
-                    {"trait_type": "Item", "value": item},
+                    {"trait_type": "Character", "value": char},
+                    {"trait_type": "Overlay", "value": overlay or "None"},
                 ],
+                "layers": {
+                    "char": char,
+                    "overlay": overlay,
+                },
             }
             (out_meta / meta_name).write_text(json.dumps(meta, indent=2), encoding="utf-8")
 
-            writer.writerow(
-                [
-                    token_id,
-                    file_name,
-                    tier.name,
-                    power,
-                    skin,
-                    hair_style,
-                    hair_color,
-                    eyes_style,
-                    eyes_color,
-                    mouth,
-                    item,
-                ]
-            )
+            writer.writerow([
+                token_id, file_name, tier.name, power, name,
+                char, overlay or "",
+            ])
 
-        print(f"Done. Wrote: {out_images} + {out_meta} + {csv_path}")
+        print(f"Done. Generated {args.count} heroes => {out_images} + {out_meta} + {csv_path}")
 
     finally:
         csv_f.close()

@@ -1,4 +1,5 @@
 import type { EquippedItems } from "@/lib/items"
+import { type HeroLayers, randomLayers, heroImageUrl } from "@/lib/heroLayers"
 
 export type Hero = {
   name: string
@@ -7,6 +8,7 @@ export type Hero = {
   ability: string
   rarity: "Common" | "Rare" | "Epic" | "Legendary"
   imageUrl: string
+  layers?: HeroLayers
 
   /** ❤️ Health (HP pool) */
   health: number
@@ -54,6 +56,12 @@ export function coerceHero(raw: any): Hero | null {
   const xp = num(raw.xp, 0)
   const level = num(raw.level, 1)
 
+  const layers: HeroLayers | undefined = raw.layers && typeof raw.layers === "object"
+    ? raw.layers as HeroLayers
+    : undefined
+
+  const resolvedImageUrl = layers ? heroImageUrl(layers, rarity) : imageUrl
+
   if (hasNewStats) {
     const ability = typeof raw.ability === "string" ? raw.ability : typeof legacyPower === "string" ? legacyPower : "Unknown"
     return {
@@ -61,7 +69,8 @@ export function coerceHero(raw: any): Hero | null {
       gender,
       ability,
       rarity,
-      imageUrl,
+      imageUrl: resolvedImageUrl,
+      layers,
       health: num(raw.health, num(legacyAttack, 10)),
       power: num(raw.power, num(legacyAttack, 10)),
       defense: num(raw.defense, num(legacyDefense, 10)),
@@ -80,7 +89,8 @@ export function coerceHero(raw: any): Hero | null {
     gender,
     ability,
     rarity,
-    imageUrl,
+    imageUrl: resolvedImageUrl,
+    layers,
     health: num(legacyAttack, 10),
     power: num(legacyAttack, 10),
     defense: num(legacyDefense, 10),
@@ -93,61 +103,61 @@ export function coerceHero(raw: any): Hero | null {
 }
 
 const names = [
-  "Shadow Viper",
-  "Iron Fist",
-  "Stone Hawk",
-  "Dark Wolf",
-  "Steel Fox",
-  "Night Crow",
-  "Ash Knight",
-  "Frost Blade",
-  "Ember Guard",
-  "Mud Runner",
-  "Grim Archer",
-  "Hollow Monk",
-  "Blunt Edge",
-  "Rusted Axe",
-  "Pale Rider",
-  "Neon Falcon",
-  "Azure Spectre",
-  "Titanium Ranger",
-  "Volt Striker",
-  "Jade Phantom",
-  "Crimson Wave",
-  "Silver Arrow",
-  "Thunder Monk",
-  "Plasma Fist",
-  "Sonic Blade",
-  "Storm Chaser",
-  "Venom Hawk",
-  "Crystal Guard",
-  "Magma Knight",
-  "Blaze Runner",
-  "Crimson Phantom",
-  "Obsidian Wraith",
-  "Emerald Knight",
-  "Solar Flare",
-  "Void Walker",
-  "Nova Striker",
-  "Quantum Blade",
-  "Cyber Phantom",
-  "Dark Matter",
-  "Astral Wolf",
-  "Prism Knight",
-  "Neutron Fox",
-  "Omega Guard",
-  "Apex Hunter",
-  "Nexus Monk",
-  "Golden Phoenix",
-  "Silver Sentinel",
-  "Eternal Dragon",
-  "Cosmic Emperor",
-  "Divine Titan",
-  "Celestial Wolf",
-  "Infinity Blade",
-  "Mythic Falcon",
-  "Sacred Phoenix",
-  "Arcane God",
+  "Blood Reaver",
+  "Void Sorceress",
+  "Bone Lord",
+  "Dawn Crusader",
+  "Shadow Fang",
+  "Iron Warlord",
+  "Wild Shaman",
+  "Crimson Hunter",
+  "Frost Weaver",
+  "Doom Knight",
+  "Inferno Mage",
+  "Divine Oracle",
+  "Phantom Monk",
+  "Blood Prince",
+  "Stone Titan",
+  "Grim Stalker",
+  "Storm Herald",
+  "Plague Walker",
+  "Astral Archer",
+  "Rage Berserker",
+  "Death Warden",
+  "War Maiden",
+  "Dune Prophet",
+  "Frost Queen",
+  "Night Blade",
+  "Rune Forger",
+  "Ghost Walker",
+  "Hex Warlock",
+  "Dragon Slayer",
+  "Arcane Sentinel",
+  "Venom Blade",
+  "Blood Mage",
+  "Titan Guard",
+  "Lunar Knight",
+  "Chaos Weaver",
+  "Iron Maiden",
+  "Soul Reaper",
+  "Crystal Sage",
+  "Wind Dancer",
+  "Hellfire Demon",
+  "Cursed Captain",
+  "War Priest",
+  "Shadow Archer",
+  "Beast Lord",
+  "Enchantress",
+  "Fallen Angel",
+  "Mad Alchemist",
+  "Grove Warden",
+  "Void Mage",
+  "Thunder God",
+  "Oni Samurai",
+  "Clockwork Knight",
+  "Dark Witch",
+  "Arena Champion",
+  "Lich King",
 ]
 
 const abilities = [
@@ -224,14 +234,15 @@ export function generateHero(): Hero {
   const gender = genders[Math.floor(Math.random() * genders.length)]
   const ability = abilities[Math.floor(Math.random() * abilities.length)]
   const rarity = generateRarity()
-  const filename = name.toLowerCase().replace(/ /g, "_") + ".png"
-  const imageUrl = `/heroes/${filename}`
+  const layers = randomLayers()
+  const imageUrl = heroImageUrl(layers, rarity)
   return {
     name,
     gender,
     ability,
     rarity,
     imageUrl,
+    layers,
     health: generateStatForRarity(rarity),
     power: generateStatForRarity(rarity),
     defense: generateStatForRarity(rarity),

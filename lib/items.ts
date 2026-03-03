@@ -12,6 +12,7 @@ export type Item = {
   bonusDEF: number
   bonusLCK: number
   imageEmoji: string
+  imageUrl?: string
   /** Present only for Set items */
   set?: string
 }
@@ -27,30 +28,37 @@ const slotEmoji: Record<ItemSlot, string> = {
   helmet: "⛑️",
 }
 
+function getItemImageUrl(slot: ItemSlot, rarity: ItemRarity, setName?: string): string {
+  if (rarity === "Set" && setName) {
+    return `/items/${slot}_set_${setName.toLowerCase()}.png`
+  }
+  return `/items/${slot}_${rarity.toLowerCase()}.png`
+}
+
 const itemNames: Record<ItemSlot, Record<Exclude<ItemRarity, "Set">, string[]>> = {
   weapon: {
-    Common: ["Iron Blade", "Rusty Saber", "Soldier's Knife"],
-    Rare: ["Steel Edge", "Knight's Rapier", "Gleam Cutter"],
-    Epic: ["Shadow Slicer", "Wraithfang", "Voidbrand"],
-    Legendary: ["Divine Sword", "Sunpiercer", "Mythic Greatblade"],
+    Common: ["Iron Blade", "Rusty Saber", "Soldier's Knife", "Worn Hatchet", "Militia Spear", "Scout Dagger", "Copper Mace"],
+    Rare: ["Steel Edge", "Knight Saber", "Storm Pike", "Gleam Cutter", "War Hammer", "Frost Cleaver", "Silver Rapier"],
+    Epic: ["Shadow Slicer", "Wraithfang", "Voidbrand", "Nightfall Axe", "Doom Halberd", "Soul Reaver", "Phantom Scythe"],
+    Legendary: ["Divine Sword", "Sunpiercer", "Mythic Greatblade", "Eternity Edge", "Godslayer", "Starforged Glaive", "Archangel Blade"],
   },
   shield: {
-    Common: ["Wooden Guard", "Tin Buckler", "Pine Wall"],
-    Rare: ["Iron Wall", "Aegis Plate", "Guardian Disc"],
-    Epic: ["Void Barrier", "Nightguard", "Astral Bulwark"],
-    Legendary: ["Celestial Shield", "Starward Aegis", "Godwall"],
+    Common: ["Wooden Guard", "Tin Buckler", "Pine Wall", "Militia Shield", "Hide Barrier"],
+    Rare: ["Iron Wall", "Aegis Plate", "Guardian Disc", "Templar Shield", "Frost Guard"],
+    Epic: ["Void Barrier", "Nightguard", "Astral Bulwark", "Phantom Ward", "Eclipse Aegis"],
+    Legendary: ["Celestial Shield", "Starward Aegis", "Godwall", "Divine Fortress", "Eternal Bastion"],
   },
   boots: {
-    Common: ["Leather Boots", "Trail Treads", "Worn Runners"],
-    Rare: ["Swift Runners", "Windwalkers", "Fleet Steps"],
-    Epic: ["Shadow Steps", "Blink Striders", "Umbral Greaves"],
-    Legendary: ["Lightning Boots", "Thunder Greaves", "Eternal Sprint"],
+    Common: ["Leather Boots", "Trail Treads", "Worn Runners", "Cloth Sandals", "Scout Shoes"],
+    Rare: ["Swift Runners", "Windwalkers", "Fleet Steps", "Gale Treads", "Storm Striders"],
+    Epic: ["Shadow Steps", "Blink Striders", "Umbral Greaves", "Phase Boots", "Nightstep Sabatons"],
+    Legendary: ["Lightning Boots", "Thunder Greaves", "Eternal Sprint", "Celestial Treads", "Godspeed Sabatons"],
   },
   helmet: {
-    Common: ["Copper Helm", "Cloth Hood", "Dented Cap"],
-    Rare: ["Steel Crown", "Vanguard Helm", "Lion Visor"],
-    Epic: ["Dark Visor", "Phantom Helm", "Nightwatch Mask"],
-    Legendary: ["God Helmet", "Halo Crown", "Astral Diadem"],
+    Common: ["Copper Helm", "Cloth Hood", "Dented Cap", "Scout Cap", "Tin Visor"],
+    Rare: ["Steel Crown", "Vanguard Helm", "Lion Visor", "Knight Sallet", "Battle Coif"],
+    Epic: ["Dark Visor", "Phantom Helm", "Nightwatch Mask", "Void Crown", "Eclipse Circlet"],
+    Legendary: ["God Helmet", "Halo Crown", "Astral Diadem", "Seraph Helm", "Eternal Visage"],
   },
 }
 
@@ -92,37 +100,35 @@ function pick<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)]
 }
 
-export function generateItemBonuses(rarity: Exclude<ItemRarity, "Set">): { pwr: number; def: number; lck: number } {
+function randRange(min: number, max: number): number {
+  return Math.floor(Math.random() * (max - min + 1)) + min
+}
+
+export function generateItemBonuses(rarity: Exclude<ItemRarity, "Set">, slot?: ItemSlot): { pwr: number; def: number; lck: number } {
   let pwr = 0
   let def = 0
   let lck = 0
 
   if (rarity === "Common") {
-    const stats: Array<"pwr" | "def" | "lck"> = ["pwr", "def", "lck"]
-    const chosen = pick(stats)
-    if (chosen === "pwr") pwr = 5
-    if (chosen === "def") def = 5
-    if (chosen === "lck") lck = 5
+    if (slot === "weapon") { pwr = randRange(3, 7); def = 0; lck = randRange(0, 3) }
+    else if (slot === "shield") { pwr = 0; def = randRange(3, 7); lck = randRange(0, 2) }
+    else if (slot === "helmet") { pwr = randRange(0, 2); def = randRange(2, 5); lck = randRange(1, 3) }
+    else { pwr = randRange(0, 2); def = randRange(1, 3); lck = randRange(2, 5) }
   } else if (rarity === "Rare") {
-    const stats: Array<"pwr" | "def" | "lck"> = ["pwr", "def", "lck"]
-    const first = pick(stats)
-    const remaining = stats.filter((s) => s !== first)
-    const second = pick(remaining)
-    if (first === "pwr") pwr = 10
-    if (first === "def") def = 10
-    if (first === "lck") lck = 10
-    if (second === "pwr") pwr += 5
-    if (second === "def") def += 5
-    if (second === "lck") lck += 5
+    if (slot === "weapon") { pwr = randRange(8, 14); def = randRange(0, 4); lck = randRange(2, 6) }
+    else if (slot === "shield") { pwr = randRange(0, 3); def = randRange(8, 14); lck = randRange(2, 5) }
+    else if (slot === "helmet") { pwr = randRange(2, 5); def = randRange(5, 10); lck = randRange(3, 7) }
+    else { pwr = randRange(2, 5); def = randRange(3, 6); lck = randRange(6, 12) }
   } else if (rarity === "Epic") {
-    pwr = 15
-    def = 10
-    lck = 5
+    if (slot === "weapon") { pwr = randRange(16, 24); def = randRange(3, 8); lck = randRange(4, 10) }
+    else if (slot === "shield") { pwr = randRange(3, 6); def = randRange(16, 24); lck = randRange(4, 8) }
+    else if (slot === "helmet") { pwr = randRange(6, 12); def = randRange(10, 18); lck = randRange(5, 10) }
+    else { pwr = randRange(4, 8); def = randRange(5, 10); lck = randRange(14, 22) }
   } else {
-    // Legendary
-    pwr = 25
-    def = 25
-    lck = 25
+    if (slot === "weapon") { pwr = randRange(28, 40); def = randRange(8, 16); lck = randRange(10, 18) }
+    else if (slot === "shield") { pwr = randRange(8, 14); def = randRange(28, 40); lck = randRange(10, 16) }
+    else if (slot === "helmet") { pwr = randRange(14, 22); def = randRange(20, 32); lck = randRange(12, 20) }
+    else { pwr = randRange(10, 18); def = randRange(12, 20); lck = randRange(26, 38) }
   }
 
   return { pwr, def, lck }
@@ -146,13 +152,14 @@ export function generateItem(): Item {
       bonusDEF: piece.bonusDEF,
       bonusLCK: piece.bonusLCK,
       imageEmoji: piece.imageEmoji,
+      imageUrl: getItemImageUrl(slot, rarity, set),
       set,
     }
   }
 
   const slot = randomSlot()
   const name = pick(itemNames[slot][rarity])
-  const { pwr, def, lck } = generateItemBonuses(rarity)
+  const { pwr, def, lck } = generateItemBonuses(rarity, slot)
   return {
     id,
     name,
@@ -162,6 +169,7 @@ export function generateItem(): Item {
     bonusDEF: def,
     bonusLCK: lck,
     imageEmoji: slotEmoji[slot],
+    imageUrl: getItemImageUrl(slot, rarity),
   }
 }
 

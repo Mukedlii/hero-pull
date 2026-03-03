@@ -1,6 +1,6 @@
 import { HEROES, type Hero } from '@/lib/heroes'
+import { LAYER_OPTIONS, type HeroLayers, heroImageUrl } from '@/lib/heroLayers'
 
-// Deterministic PRNG (mulberry32)
 function mulberry32(seed: number) {
   return function () {
     let t = (seed += 0x6d2b79f5)
@@ -11,7 +11,6 @@ function mulberry32(seed: number) {
 }
 
 function rarityFromRng(r: number): Hero['rarity'] {
-  // Similar to current generateRarity(): tweak as desired
   if (r < 0.03) return 'Legendary'
   if (r < 0.15) return 'Epic'
   if (r < 0.4) return 'Rare'
@@ -24,13 +23,20 @@ export function heroFromTokenId(tokenId: bigint): Hero {
 
   const rarity = rarityFromRng(rand())
 
-  // Pick a hero name deterministically.
   const idx = Math.floor(rand() * HEROES.length)
   const base = HEROES[idx]
 
-  // Derive stats deterministically but stable.
   const level = 1 + Math.floor(rand() * 10)
   const bump = rarity === 'Legendary' ? 10 : rarity === 'Epic' ? 6 : rarity === 'Rare' ? 3 : 0
+
+  const layers: HeroLayers = {
+    char: LAYER_OPTIONS.chars[Math.floor(rand() * LAYER_OPTIONS.chars.length)],
+    overlay: rand() < 0.5
+      ? LAYER_OPTIONS.overlays[Math.floor(rand() * LAYER_OPTIONS.overlays.length)]
+      : null,
+  }
+
+  const imageUrl = heroImageUrl(layers, rarity)
 
   return {
     ...base,
@@ -41,5 +47,7 @@ export function heroFromTokenId(tokenId: bigint): Hero {
     defense: base.defense + bump,
     luck: base.luck + bump,
     ability: base.ability,
+    imageUrl,
+    layers,
   }
 }

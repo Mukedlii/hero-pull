@@ -79,3 +79,44 @@ body {
   animation: battle-dmg-pop 520ms ease-out;
   pointer-events: none;
 }
+
+/* New Battle Animations */
+@keyframes attack-lunge-right {
+  0% { transform: translateX(0) scale(1); z-index: 10; }
+  40% { transform: translateX(40px) scale(1.1); z-index: 10; }
+  60% { transform: translateX(40px) scale(1.1); z-index: 10; }
+  100% { transform: translateX(0) scale(1); z-index: 1; }
+}
+
+@keyframes attack-lunge-left {
+  0% { transform: translateX(0) scale(1); z-index: 10; }
+  40% { transform: translateX(-40px) scale(1.1); z-index: 10; }
+  60% { transform: translateX(-40px) scale(1.1); z-index: 10; }
+  100% { transform: translateX(0) scale(1); z-index: 1; }
+}
+
+.attack-lunge-right {
+  animation: attack-lunge-right 400ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.attack-lunge-left {
+  animation: attack-lunge-left 400ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes screen-shake {
+  0% { transform: translate(1px, 1px) rotate(0deg); }
+  10% { transform: translate(-1px, -2px) rotate(-1deg); }
+  20% { transform: translate(-3px, 0px) rotate(1deg); }
+  30% { transform: translate(3px, 2px) rotate(0deg); }
+  40% { transform: translate(1px, -1px) rotate(1deg); }
+  50% { transform: translate(-1px, 2px) rotate(-1deg); }
+  60% { transform: translate(-3px, 1px) rotate(0deg); }
+  70% { transform: translate(3px, 1px) rotate(-1deg); }
+  80% { transform: translate(-1px, -1px) rotate(1deg); }
+  90% { transform: translate(1px, 2px) rotate(0deg); }
+  100% { transform: translate(1px, -2px) rotate(-1deg); }
+}
+
+.screen-shake {
+  animation: screen-shake 300ms ease-in-out;
+}

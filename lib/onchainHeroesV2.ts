@@ -1,6 +1,6 @@
 import { HEROES, type Hero } from "@/lib/heroes"
+import { LAYER_OPTIONS, type HeroLayers, heroImageUrl } from "@/lib/heroLayers"
 
-// Deterministic PRNG (mulberry32)
 function mulberry32(seed: number) {
   return function () {
     let t = (seed += 0x6d2b79f5)
@@ -29,6 +29,15 @@ export function heroFromSeed(seedBig: bigint, tokenId: bigint): Hero {
   const level = 1 + Math.floor(rand() * 10)
   const bump = rarity === "Legendary" ? 10 : rarity === "Epic" ? 6 : rarity === "Rare" ? 3 : 0
 
+  const layers: HeroLayers = {
+    char: LAYER_OPTIONS.chars[Math.floor(rand() * LAYER_OPTIONS.chars.length)],
+    overlay: rand() < 0.5
+      ? LAYER_OPTIONS.overlays[Math.floor(rand() * LAYER_OPTIONS.overlays.length)]
+      : null,
+  }
+
+  const imageUrl = heroImageUrl(layers, rarity)
+
   return {
     ...base,
     rarity,
@@ -38,5 +47,7 @@ export function heroFromSeed(seedBig: bigint, tokenId: bigint): Hero {
     defense: base.defense + bump,
     luck: base.luck + bump,
     ability: base.ability,
+    imageUrl,
+    layers,
   }
 }

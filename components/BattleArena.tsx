@@ -169,11 +169,14 @@ export default function BattleArena({ hero, opponent, winner, battleId, onBattle
     const hit = activeHit === side
     const pop = hitPop?.side === side ? hitPop : null
 
+    const isAttacking = activeHit && activeHit !== side
+    const lungeClass = isAttacking ? (side === 'hero' ? 'attack-lunge-right' : 'attack-lunge-left') : ''
+
     return (
       <div
         className={`relative w-[170px] p-3 rounded-2xl border-2 bg-gray-950/60 ${rarityBorder[h.rarity]} ${
           winner === side ? 'ring-2 ring-yellow-300' : ''
-        } ${hit ? 'battle-hit battle-flash' : ''} ${eff.setBonus.setName ? 'border-[#f97316] shadow-[0_0_22px_#f97316]' : ''}`}
+        } ${hit ? 'battle-hit battle-flash' : ''} ${lungeClass} ${eff.setBonus.setName ? 'border-[#f97316] shadow-[0_0_22px_#f97316]' : ''}`}
       >
         {pop ? (
           <div key={pop.k} className="battle-dmg-pop">
@@ -232,8 +235,13 @@ export default function BattleArena({ hero, opponent, winner, battleId, onBattle
             {Object.entries(hero.equippedItems)
               .filter(([, v]) => !!v)
               .map(([slot, it]: any) => (
-                <div key={slot}>
-                  • {String(slot).toUpperCase()}: {it.imageEmoji} {it.name}
+                <div key={slot} className="flex items-center gap-1">
+                  {it.imageUrl ? (
+                    <img src={it.imageUrl} alt={it.name} className="w-4 h-4 object-contain" />
+                  ) : (
+                    <span>{it.imageEmoji}</span>
+                  )}
+                  <span>{String(slot).toUpperCase()}: {it.name}</span>
                   {it.set ? <span className="text-[#f97316]"> ({it.set})</span> : null}
                 </div>
               ))}

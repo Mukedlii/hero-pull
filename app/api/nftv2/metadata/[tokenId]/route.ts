@@ -14,19 +14,23 @@ export async function GET(req: NextRequest, ctx: { params: { tokenId: string } }
   if (!r.ok) return NextResponse.json(j, { status: r.status })
 
   const hero = j?.hero
-  const image = `https://hero-pull.vercel.app${hero?.imageUrl || "/og.png"}`
+  const host = req.headers.get("host") || "localhost:5000"
+  const proto = req.headers.get("x-forwarded-proto") || "https"
+  const siteUrl = `${proto}://${host}`
+  const image = `${siteUrl}${hero?.imageUrl || "/og.png"}`
 
   return NextResponse.json({
     name: `${hero?.name || "Hero"} #${tokenId}`,
-    description: "Hero Pull — V2 heroes store a seed onchain and render metadata from it.",
+    description: "Hero Pull — Dark fantasy RPG heroes on Base. Collectible and tradeable NFTs.",
     image,
+    external_url: `${siteUrl}/collection`,
     attributes: [
       { trait_type: "Rarity", value: hero?.rarity },
-      { trait_type: "Level", value: hero?.level },
-      { trait_type: "Health", value: hero?.health },
-      { trait_type: "Power", value: hero?.power },
-      { trait_type: "Defense", value: hero?.defense },
-      { trait_type: "Luck", value: hero?.luck },
+      { trait_type: "Level", display_type: "number", value: hero?.level },
+      { trait_type: "Health", display_type: "number", value: hero?.health },
+      { trait_type: "Power", display_type: "number", value: hero?.power },
+      { trait_type: "Defense", display_type: "number", value: hero?.defense },
+      { trait_type: "Luck", display_type: "number", value: hero?.luck },
     ],
   })
 }

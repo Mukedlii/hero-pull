@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import type { Hero } from "@/lib/heroes"
+import LoadingDots from "@/components/LoadingDots"
 import { HERO_PULL_V2_CONTRACT_ADDRESS } from "@/lib/heroPullV2Contract"
 import { HERO_PULL_V3_CONTRACT_ADDRESS } from "@/lib/heroPullV3Contract"
 import { HERO_PULL_V4_CONTRACT_ADDRESS } from "@/lib/heroPullV4Contract"
@@ -80,7 +81,7 @@ export function WalletHeroes({ onSelect }: { onSelect?: (hero: Hero & { tokenId?
     })()
   }, [])
 
-  if (loading) return <div className="text-xs text-gray-400 text-center mt-6">Loading heroes from wallet…</div>
+  if (loading) return <LoadingDots text="Loading heroes from wallet..." />
   if (err) return <div className="text-xs text-red-400 text-center mt-6">{err}</div>
 
   return (

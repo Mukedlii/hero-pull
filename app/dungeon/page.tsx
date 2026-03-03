@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import frameSdk from "@farcaster/frame-sdk"
 import { coerceHero, type Hero } from "@/lib/heroes"
+import LoadingDots from "@/components/LoadingDots"
 import type { EquippedItems, Item, ItemRarity, ItemSlot } from "@/lib/items"
 import { FULL_SET_BONUS, generateItem, getEquippedBonuses, getSetBonus } from "@/lib/items"
 import { addItemToInventory } from "@/lib/inventory"
@@ -26,6 +27,7 @@ type PotionCounts = Record<PotionType, number>
 type Enemy = {
   name: string
   emoji: string
+  imageUrl?: string
   hp: number
   maxHp: number
   atk: number
@@ -317,6 +319,17 @@ function enemyFromLevel(level: number, floor: number, boss: boolean): Enemy {
   return {
     name: boss ? cfg.boss.name : `Lv${level} ${floor <= 3 ? "Scavenger" : floor <= 6 ? "Raider" : "Elite"}`,
     emoji: boss ? cfg.boss.emoji : level >= 8 ? "🐲" : level >= 5 ? "👹" : "👺",
+    imageUrl: boss
+      ? cfg.boss.imageUrl
+      : level >= 8
+        ? "/enemies/dragon_enemy.png"
+        : level >= 5
+          ? "/enemies/demon_enemy.png"
+          : floor <= 3
+            ? "/enemies/scavenger.png"
+            : floor <= 6
+              ? "/enemies/raider.png"
+              : "/enemies/elite.png",
     hp,
     maxHp: hp,
     atk,
@@ -1039,7 +1052,7 @@ export default function DungeonPage() {
   if (loading) {
     return (
       <div className="px-4 pb-24">
-        <div className="text-xs text-gray-400 text-center mt-10">Loading…</div>
+        <LoadingDots text="Loading dungeon..." />
       </div>
     )
   }
@@ -1127,7 +1140,7 @@ export default function DungeonPage() {
                 return (
                   <div key={slot} className="flex items-center justify-between border border-gray-800 bg-gray-900/30 rounded-xl px-2 py-1">
                     <div className="text-[11px] text-gray-300">
-                      <span className="text-gray-500">{slotLabel(slot)}:</span> {it ? `${it.imageEmoji} ${it.name}` : "—"}
+                      <span className="text-gray-500">{slotLabel(slot)}:</span> {it ? <>{it.imageUrl ? <img src={it.imageUrl} alt={it.name} className="inline w-4 h-4 object-contain mx-1" /> : it.imageEmoji} {it.name}</> : "—"}
                     </div>
                     {it ? <div className="text-[10px] text-gray-400">PWR+{it.bonusPWR} DEF+{it.bonusDEF} LCK+{it.bonusLCK}</div> : null}
                   </div>
@@ -1267,9 +1280,26 @@ export default function DungeonPage() {
             <div className="mt-3">
               <div className="flex items-center justify-between border border-gray-800 rounded-xl p-3 bg-gray-950/30">
                 <div className="flex items-center gap-3">
-                  <div className="text-3xl">{enemy.emoji}</div>
+                  {enemy.imageUrl ? (
+                    <img
+                      src={enemy.imageUrl}
+                      alt={enemy.name}
+                      className="w-12 h-12 object-contain rounded-lg"
+                      data-testid="enemy-image"
+                      onError={(e) => {
+                        const el = e.currentTarget
+                        el.style.display = "none"
+                        const fallback = document.createElement("div")
+                        fallback.className = "text-3xl"
+                        fallback.textContent = enemy.emoji
+                        el.parentElement?.insertBefore(fallback, el)
+                      }}
+                    />
+                  ) : (
+                    <div className="text-3xl">{enemy.emoji}</div>
+                  )}
                   <div>
-                    <div className="font-bold text-sm text-red-200">{enemy.name}</div>
+                    <div className="font-bold text-sm text-red-200" data-testid="enemy-name">{enemy.name}</div>
                     <div className="text-[11px] text-gray-400">ATK {enemy.atk} • DEF {enemy.def}</div>
                   </div>
                 </div>
@@ -1317,7 +1347,7 @@ export default function DungeonPage() {
                   <div key={it.id} className={`border-2 rounded-xl p-3 bg-gray-950/30 ${rarityBorder(it.rarity)}`}>
                     <div className="flex items-center justify-between gap-3">
                       <div>
-                        <div className="font-extrabold text-sm">{it.imageEmoji} {it.name}</div>
+                        <div className="font-extrabold text-sm flex items-center gap-1">{it.imageUrl ? <img src={it.imageUrl} alt={it.name} className="w-6 h-6 object-contain" /> : it.imageEmoji} {it.name}</div>
                         <div className="text-[11px] text-gray-400">{it.rarity} • {slotLabel(it.slot)}{it.set ? ` • Set ${it.set}` : ""}</div>
                         <div className="text-[11px] text-gray-300 mt-1">+{it.bonusPWR} PWR • +{it.bonusDEF} DEF • +{it.bonusLCK} LCK</div>
                       </div>
@@ -1375,7 +1405,7 @@ export default function DungeonPage() {
                 {lootFx === "set" && <div className="text-[10px] font-extrabold text-[#f97316]">🔥 SET ITEM DROPPED!</div>}
               </div>
 
-              <div className="mt-2 text-xs text-gray-200 font-bold">{loot.imageEmoji} {loot.name}</div>
+              <div className="mt-2 text-xs text-gray-200 font-bold flex items-center gap-1">{loot.imageUrl ? <img src={loot.imageUrl} alt={loot.name} className="w-6 h-6 object-contain" /> : loot.imageEmoji} {loot.name}</div>
               <div className="text-[11px] text-gray-400">{loot.rarity} • {slotLabel(loot.slot)}{loot.set ? ` • Set ${loot.set}` : ""}</div>
               <div className="text-[11px] text-gray-300 mt-1">PWR+{loot.bonusPWR} DEF+{loot.bonusDEF} LCK+{loot.bonusLCK}</div>
 
