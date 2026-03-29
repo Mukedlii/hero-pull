@@ -39,14 +39,14 @@ export function WalletHeroes({ onSelect }: { onSelect?: (hero: Hero & { tokenId?
         setWallet(addr)
 
         const v4 = HERO_PULL_V4_CONTRACT_ADDRESS
-          ? await fetch(`/api/wallet/heroes-rpc?owner=${addr}&contract=${HERO_PULL_V4_CONTRACT_ADDRESS}`, { cache: "no-store" }).then((r) => r.json())
+          ? await fetch(`/api/wallet/heroes?owner=${addr}&contract=${HERO_PULL_V4_CONTRACT_ADDRESS}`, { cache: "no-store" }).then((r) => r.json()).catch(() => ({ tokenIds: [] }))
           : { tokenIds: [] }
         const v3 = HERO_PULL_V3_CONTRACT_ADDRESS
-          ? await fetch(`/api/wallet/heroes-rpc?owner=${addr}&contract=${HERO_PULL_V3_CONTRACT_ADDRESS}`, { cache: "no-store" }).then((r) => r.json())
+          ? await fetch(`/api/wallet/heroes?owner=${addr}&contract=${HERO_PULL_V3_CONTRACT_ADDRESS}`, { cache: "no-store" }).then((r) => r.json()).catch(() => ({ tokenIds: [] }))
           : { tokenIds: [] }
         const v2 = HERO_PULL_V2_CONTRACT_ADDRESS
-          ? await fetch(`/api/wallet/heroes-rpc?owner=${addr}&contract=${HERO_PULL_V2_CONTRACT_ADDRESS}`, { cache: "no-store" }).then((r) => r.json())
-          : await fetch(`/api/wallet/heroes-rpc?owner=${addr}`, { cache: "no-store" }).then((r) => r.json())
+          ? await fetch(`/api/wallet/heroes?owner=${addr}&contract=${HERO_PULL_V2_CONTRACT_ADDRESS}`, { cache: "no-store" }).then((r) => r.json()).catch(() => ({ tokenIds: [] }))
+          : await fetch(`/api/wallet/heroes?owner=${addr}`, { cache: "no-store" }).then((r) => r.json()).catch(() => ({ tokenIds: [] }))
 
         const tokenIdsV4: string[] = Array.isArray(v4?.tokenIds) ? v4.tokenIds : []
         const tokenIdsV3: string[] = Array.isArray(v3?.tokenIds) ? v3.tokenIds : []
