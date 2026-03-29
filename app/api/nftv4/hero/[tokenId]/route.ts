@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createPublicClient, http } from "viem"
 import { base } from "viem/chains"
 import { HERO_PULL_V4_ABI, HERO_PULL_V4_CONTRACT_ADDRESS } from "@/lib/heroPullV4Contract"
-import { heroFromSeedAndTier, type Tier } from "@/lib/onchainHeroesV3"
+import { heroFromSeedAndTier, type Tier } from "@/lib/onchainHeroesV4"
 
 export const dynamic = "force-dynamic"
 export const revalidate = 0
