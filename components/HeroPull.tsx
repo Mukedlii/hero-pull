@@ -152,9 +152,7 @@ export default function HeroPull() {
           <div className="text-2xl">🏰</div><div className="mt-2 font-black">Dungeon</div><div className="mt-1 text-xs text-slate-400">Explore and defeat bosses</div>
         </a>
       </div>
-      <a href="/rift" className="w-full rounded-2xl border border-violet-400/30 bg-gradient-to-r from-violet-950/70 via-slate-900 to-fuchsia-950/60 p-4 text-center transition hover:border-violet-300/60">
-        <div className="text-xs font-black uppercase tracking-[0.25em] text-violet-300">New mode</div><div className="mt-1 text-lg font-black">Riftbound: Rune Battle</div><div className="mt-1 text-xs text-slate-400">Master the runes. Survive the Nemesis.</div>
-      </a>
+
     </div>
   )
 }
