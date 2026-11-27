@@ -43,7 +43,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <a href="/collection" className="flex flex-col items-center gap-1 px-2 text-violet-300 hover:text-violet-100 md:flex-row md:gap-2 md:text-sm" data-testid="nav-heroes">
                 <span className="text-xl">♙</span><span className="text-[10px]">Heroes</span>
               </a>
-              <a href="/shop" className="flex flex-col items-center gap-1 px-2 text-indigo-300 hover:text-indigo-100 md:flex-row md:gap-2 md:text-sm" data-testid="nav-shop">
+              <a href="/quests" className="flex flex-col items-center gap-1 px-2 text-amber-300 hover:text-amber-100 md:flex-row md:gap-2 md:text-sm" data-testid="nav-quests">\n                <span className="text-xl">✦</span><span className="text-[10px]">Quests</span>\n              </a>\n              <a href="/shop" className="flex flex-col items-center gap-1 px-2 text-indigo-300 hover:text-indigo-100 md:flex-row md:gap-2 md:text-sm" data-testid="nav-shop">
                 <span className="text-xl">✧</span><span className="text-[10px]">Shop</span>
               </a>
               <a href="/stats" className="flex flex-col items-center gap-1 px-2 text-emerald-300 hover:text-emerald-100 md:flex-row md:gap-2 md:text-sm" data-testid="nav-stats">
