@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { coerceHero, type Hero } from "@/lib/heroes"
 import { getEquippedBonuses, getSetBonus } from "@/lib/items"
+import { recordLiveEvent } from "@/lib/liveOps"
 import { awardHeroXp, classForAbility, readProgression, skillBonus, SKILLS, unlockSkill, type HeroProgression } from "@/lib/progression"
 
 type Rune = { id: string; icon: string; name: string; power: number; kind: "strike" | "guard" | "fire" | "heal" | "gold" | "frost" }
@@ -241,6 +242,7 @@ export default function ArenaBattlePage() {
   }
 
   const winFloor = () => {
+    recordLiveEvent(enemy.boss ? "boss_kill" : "arena_win")
     const reward = enemy.boss ? 12 : 4
     if (hero) { const result = awardHeroXp(hero.name, enemy.boss ? 65 : 25); setProgression(result.progression); addLog("+" + (enemy.boss ? 65 : 25) + " XP" + (result.levelsGained ? " · LEVEL UP! +" + result.levelsGained + " skill point" : "") + ".") }
     setBusy(false)
