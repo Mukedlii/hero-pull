@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { coerceHero, type Hero } from "@/lib/heroes"
 import { getEquippedBonuses, getSetBonus } from "@/lib/items"
+import { awardHeroXp, classForAbility, readProgression, skillBonus, SKILLS, unlockSkill, type HeroProgression } from "@/lib/progression"
 
 type Rune = { id: string; icon: string; name: string; power: number; kind: "strike" | "guard" | "fire" | "heal" | "gold" | "frost" }
 type Enemy = { name: string; icon: string; image: string; hp: number; maxHp: number; attack: number; boss: boolean }
@@ -95,6 +96,9 @@ export default function ArenaBattlePage() {
   const [log, setLog] = useState<string[]>(["The Arena is open. Your selected Hero has been summoned."])
   const [finished, setFinished] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [progression, setProgression] = useState<HeroProgression | null>(null)
+  const [combatEffect, setCombatEffect] = useState<"hero" | "combo" | null>(null)
+  const [bossPhase, setBossPhase] = useState(1)
 
   useEffect(() => {
     try {
@@ -105,6 +109,7 @@ export default function ArenaBattlePage() {
         return
       }
       setHero(parsed)
+      setProgression(readProgression(parsed.name))
       const item = getEquippedBonuses(parsed.equippedItems)
       const set = getSetBonus(parsed.equippedItems)
       const heroHp = Math.min(500, 70 + parsed.health * 2 + parsed.defense + item.def + set.def)
@@ -122,15 +127,17 @@ export default function ArenaBattlePage() {
   }, [])
 
   const stats = useMemo(() => {
-    if (!hero) return { power: 10, defense: 0, luck: 0 }
+    if (!hero) return { power: 10, defense: 0, luck: 0, crit: 0, combo: 0, cooldown: 0 }
     const item = getEquippedBonuses(hero.equippedItems)
     const set = getSetBonus(hero.equippedItems)
+    const bonus = skillBonus(progression?.unlocked || [])
     return {
-      power: hero.power + item.pwr + set.pwr + powerBonus,
+      power: Math.floor((hero.power + item.pwr + set.pwr + powerBonus) * (1 + bonus.power)),
       defense: hero.defense + item.def + set.def + defenseBonus,
       luck: hero.luck + item.lck + set.lck,
+      crit: bonus.crit, combo: bonus.combo, cooldown: bonus.cooldown,
     }
-  }, [hero, powerBonus, defenseBonus])
+  }, [hero, powerBonus, defenseBonus, progression])
 
   const addLog = (line: string) => setLog((old) => [line, ...old].slice(0, 9))
 
@@ -163,8 +170,15 @@ export default function ArenaBattlePage() {
         })
         let combo = 0
         Object.values(counts).forEach((n) => { if (n >= 2) combo += n === 3 ? 18 : 8 })
+        const has = (kind: string) => result.some((r) => r.kind === kind)
+        const synergies: string[] = []
+        if (has("fire") && has("frost")) { combo += 18; synergies.push("FROSTFIRE SHATTER") }
+        if (has("strike") && has("guard")) { combo += 14; synergies.push("RUNE RIPOSTE") }
+        if (has("heal") && has("guard")) { heal += 10; synergies.push("SANCTUARY") }
+        combo = Math.floor(combo * (1 + stats.combo))
         if (nemesisRune && result.some((r) => r.id === nemesisRune)) damage = Math.floor(damage * 0.6)
         damage += combo
+        setCombatEffect(combo > 0 ? "combo" : "hero")
         setEnemy((e) => ({ ...e, hp: Math.max(0, e.hp - damage) }))
         setGuard(block)
         setWeakened(frost)
@@ -176,7 +190,7 @@ export default function ArenaBattlePage() {
         setRolled(true)
         setSpinning(false)
         setBusy(false)
-        addLog("Runes dealt " + damage + " damage" + (combo ? " including " + combo + " combo damage" : "") + (block ? ", gained " + block + " guard" : "") + (heal ? ", restored " + heal + " HP" : "") + (extraGold ? ", found " + extraGold + " gold" : "") + (frost ? ", Frost weakened the enemy" : "") + ".")
+        addLog("Runes dealt " + damage + " damage" + (combo ? " including " + combo + " combo damage" : "") + (block ? ", gained " + block + " guard" : "") + (heal ? ", restored " + heal + " HP" : "") + (extraGold ? ", found " + extraGold + " gold" : "") + (frost ? ", Frost weakened the enemy" : "") + (synergies.length ? ", " + synergies.join(" + ") + "!" : "") + ".")
       }
     }, 90)
   }
@@ -185,11 +199,18 @@ export default function ArenaBattlePage() {
     if (!rolled || busy || finished || choices.length > 0) return
     setBusy(true)
     const afterRuneHp = enemy.hp
+    if (enemy.boss && bossPhase === 1 && afterRuneHp > 0 && afterRuneHp <= enemy.maxHp * 0.5) {
+      setBossPhase(2)
+      setEnemy((e) => ({ ...e, attack: Math.floor(e.attack * 1.3) }))
+      addLog("BOSS PHASE 2 · " + enemy.name + " enrages! Attack increased by 30%.")
+      setRolled(false); setGuard(0); setWeakened(false); setEnemyStunned(false); setBusy(false)
+      return
+    }
     if (afterRuneHp <= 0) {
       winFloor()
       return
     }
-    const critChance = Math.min(0.45, 0.05 + stats.luck / 500)
+    const critChance = Math.min(0.60, 0.05 + stats.luck / 500 + stats.crit)
     const crit = Math.random() < critChance
     const damage = Math.max(3, Math.floor(stats.power * (0.32 + Math.random() * 0.12) * (crit ? 1.8 : 1)))
     const remaining = Math.max(0, afterRuneHp - damage)
@@ -221,6 +242,7 @@ export default function ArenaBattlePage() {
 
   const winFloor = () => {
     const reward = enemy.boss ? 12 : 4
+    if (hero) { const result = awardHeroXp(hero.name, enemy.boss ? 65 : 25); setProgression(result.progression); addLog("+" + (enemy.boss ? 65 : 25) + " XP" + (result.levelsGained ? " · LEVEL UP! +" + result.levelsGained + " skill point" : "") + ".") }
     setBusy(false)
     setRolled(false)
     setGuard(0)
@@ -241,6 +263,7 @@ export default function ArenaBattlePage() {
       setNemesisRune(null)
     }
     setEnemy(nextEnemy)
+    setBossPhase(1)
     setChoices(shuffle(enemy.boss ? BOSS_RELICS : RELICS).slice(0, 3))
     addLog((enemy.boss ? "BOSS DEFEATED! " : "Floor cleared! ") + "+" + (reward + goldBonus) + " gold. Choose a relic.")
   }
@@ -248,6 +271,7 @@ export default function ArenaBattlePage() {
   const useAbility = () => {
     if (!hero || !rolled || busy || finished || choices.length > 0 || skillCooldown > 0 || enemy.hp <= 0) return
     const ability = hero.ability.toLowerCase()
+    setCombatEffect("hero")
     const isHeal = /heal|healing|oracle|priest|mender/.test(ability)
     const isShield = /shield|guard|barrier|defen|freeze|prison|time/.test(ability)
     const isControl = /freeze|prison|time|control|gravity|invisibility|telekinesis/.test(ability)
@@ -274,7 +298,7 @@ export default function ArenaBattlePage() {
         addLog(hero.ability + ": dealt " + damage + " ability damage" + (isControl ? " and stunned the enemy" : "") + ".")
       }
     }
-    setSkillCooldown(2)
+    setSkillCooldown(Math.max(1, 2 - stats.cooldown))
   }
 
   const chooseRelic = (r: Relic) => {
@@ -290,7 +314,7 @@ export default function ArenaBattlePage() {
   }
 
   const restart = () => {
-    setFloor(1); setGold(8); setRelics([]); setPowerBonus(0); setDefenseBonus(0); setFireBonus(0); setGoldBonus(0)
+    setFloor(1); setBossPhase(1); setGold(8); setRelics([]); setPowerBonus(0); setDefenseBonus(0); setFireBonus(0); setGoldBonus(0)
     setEnemy(enemyFor(1)); setRolled(false); setSpinning(false); setGuard(0); setWeakened(false); setEnemyStunned(false); setSkillCooldown(0); setTeamPower(0); setNemesisRune(null)
     setRuneUse({}); setChoices([]); setFinished(false); setLog(["A new expedition begins."])
     if (hero) { const item = getEquippedBonuses(hero.equippedItems); const set = getSetBonus(hero.equippedItems); const h = Math.min(500, 70 + hero.health * 2 + hero.defense + item.def + set.def); setMaxHp(h); setHp(h) }
@@ -334,7 +358,7 @@ export default function ArenaBattlePage() {
 
       <div className="mt-4 rounded-2xl border border-purple-700/60 bg-gradient-to-br from-[#251631] via-gray-900 to-[#101322] p-4 shadow-[0_0_28px_rgba(139,92,246,0.12)]">
         <div className="flex items-center gap-3">
-          <div className="relative h-32 w-32 shrink-0 overflow-hidden rounded-2xl border border-violet-300/40 bg-gradient-to-br from-violet-500/30 via-slate-900 to-fuchsia-950 shadow-[0_0_28px_rgba(139,92,246,0.28)]">
+          <div className={"relative h-32 w-32 shrink-0 overflow-hidden rounded-2xl border border-violet-300/40 bg-gradient-to-br from-violet-500/30 via-slate-900 to-fuchsia-950 shadow-[0_0_28px_rgba(139,92,246,0.28)] " + (combatEffect === "hero" ? "animate-hero-strike" : combatEffect === "combo" ? "animate-combo-burst" : "")}>
             <img src={hero?.imageUrl || "/og.png"} alt={hero?.name || "Hero"} className="h-full w-full object-cover" />
             <div className="absolute inset-x-0 bottom-0 bg-black/70 px-1 py-0.5 text-center text-[8px] font-black tracking-widest text-violet-200">{hero?.rarity?.toUpperCase()}</div>
           </div>
@@ -374,7 +398,7 @@ export default function ArenaBattlePage() {
         </div>
         <div className="flex justify-between text-[10px] text-gray-400 mt-3"><span>ENEMY HP</span><span>{enemy.hp}/{enemy.maxHp}</span></div>
         <div className="h-2 rounded-full bg-gray-800 overflow-hidden mt-1"><div className="h-full bg-red-500 transition-all" style={{ width: enemyPercent + "%" }} /></div>
-        <div className="text-[10px] text-gray-500 mt-2">{enemy.boss ? "☠ BOSS ENCOUNTER · " : ""}Attack {enemy.attack}{nemesisRune ? " · Nemesis resists your " + (nemesisRune === "strike" ? "Blade" : "Ember") + " rune" : ""}{enemyStunned ? " · STUNNED" : ""}{weakened ? " · WEAKENED" : ""}</div>
+        <div className="text-[10px] text-gray-500 mt-2">{enemy.boss ? "☠ BOSS ENCOUNTER · PHASE " + bossPhase + " · " : ""}Attack {enemy.attack}{nemesisRune ? " · Nemesis resists your " + (nemesisRune === "strike" ? "Blade" : "Ember") + " rune" : ""}{enemyStunned ? " · STUNNED" : ""}{weakened ? " · WEAKENED" : ""}</div>
       </div>
 
       <div className="mt-4 rounded-2xl border border-gray-800 bg-gray-900/80 p-4">
@@ -391,6 +415,11 @@ export default function ArenaBattlePage() {
         <p className="text-[10px] text-gray-500 mt-2">Matching runes trigger combo damage. Frost weakens the counterattack; your hero ability adds a tactical skill with a short cooldown.</p>
       </div>
 
+      {hero && progression && <div className="mt-4 rounded-2xl border border-cyan-500/30 bg-cyan-950/20 p-4">
+        <div className="flex items-center justify-between"><div><div className="text-[10px] tracking-widest text-cyan-300">HERO CLASS · {classForAbility(hero.ability).toUpperCase()}</div><h2 className="text-sm font-black text-white">SKILL TREE</h2></div><div className="rounded-lg bg-cyan-900/50 px-3 py-2 text-center"><div className="text-[9px] text-cyan-200">SKILL POINTS</div><b className="text-lg text-cyan-100">{progression.skillPoints}</b></div></div>
+        <div className="mt-2 text-[10px] text-gray-400">XP {progression.xpEarned} · Next skill point at {Math.floor(progression.xpEarned / 100) * 100 + 100} XP</div>
+        <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">{SKILLS.map((skill) => { const owned=progression.unlocked.includes(skill.id); return <button key={skill.id} disabled={owned||progression.skillPoints<skill.cost} onClick={()=>setProgression(unlockSkill(hero.name,skill.id))} className="rounded-xl border border-cyan-800/40 bg-black/30 p-3 text-left disabled:opacity-50"><div className="flex justify-between gap-2"><b className="text-xs text-cyan-100">{skill.name}</b><span className="text-[9px] text-amber-300">{owned?"UNLOCKED":skill.cost+" PT"}</span></div><p className="mt-1 text-[10px] text-gray-400">{skill.description}</p></button> })}</div>
+      </div>}
       {choices.length > 0 && <div className="mt-4 rounded-2xl border border-yellow-700/50 bg-yellow-950/10 p-4"><h2 className="text-xs font-extrabold text-yellow-300 tracking-widest">VICTORY · CHOOSE A RELIC</h2><div className="grid grid-cols-1 gap-2 mt-3">{choices.map((r) => <button key={r.id} onClick={() => chooseRelic(r)} className="text-left rounded-xl border border-yellow-700/30 bg-gray-950/80 p-3 hover:border-yellow-400"><span className="text-xl mr-2">{r.icon}</span><b className="text-sm">{r.name}</b><div className="text-[10px] text-gray-400 ml-8">{r.text}</div></button>)}</div></div>}
 
       {relics.length > 0 && <div className="mt-4 rounded-xl border border-gray-800 bg-gray-950/70 p-3"><div className="text-[10px] text-yellow-300 font-bold tracking-widest">YOUR RELICS</div><div className="flex flex-wrap gap-2 mt-2">{relics.map((r, i) => <span key={r.id + i} className="text-[10px] rounded-full border border-yellow-700/40 px-2 py-1">{r.icon} {r.name}</span>)}</div></div>}
