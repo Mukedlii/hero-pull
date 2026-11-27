@@ -50,8 +50,8 @@ function enemyFor(floor: number): Enemy {
   const hp = Math.floor(normalHp * (boss ? 1.8 : 1))
   const attack = Math.floor((base[3] + chapter * 2) * (boss ? 1.35 : 1))
   const index = (Math.floor(floor / 5) - 1) % bossNames.length
-  const bossImages = ["/enemies/boss_goblin_king.png", "/enemies/boss_hellkeeper.png", "/enemies/boss_shadow_lord.png", "/enemies/boss_final_abyss.png"]
-  const enemyImages = ["/enemies/raider.png", "/enemies/scavenger.png", "/enemies/elite.png", "/enemies/demon_enemy.png", "/enemies/dragon_enemy.png"]
+  const bossImages = ["/enemies/boss_final_abyss.png", "/enemies/boss_hellkeeper.png", "/enemies/boss_ancient_drake.png", "/enemies/boss_shadow_lord.png"]
+  const enemyImages = ["/enemies/raider.png", "/enemies/demon_enemy.png", "/enemies/elite.png", "/enemies/scavenger.png", "/enemies/dragon_enemy.png"]
   return {
     name: boss ? bossNames[index] : base[0],
     icon: boss ? bossIcons[index] : base[1],
