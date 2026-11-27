@@ -120,3 +120,8 @@ body {
 .screen-shake {
   animation: screen-shake 300ms ease-in-out;
 }
+
+@keyframes heroStrike {0%{transform:translateX(0) scale(1)}35%{transform:translateX(12px) scale(1.05)}70%{transform:translateX(-5px)}100%{transform:translateX(0) scale(1)}}
+@keyframes comboBurst {0%{transform:scale(1);filter:drop-shadow(0 0 0 rgba(168,85,247,0))}45%{transform:scale(1.12);filter:drop-shadow(0 0 18px rgba(168,85,247,.95))}100%{transform:scale(1);filter:drop-shadow(0 0 0 rgba(168,85,247,0))}}
+.animate-hero-strike{animation:heroStrike .45s ease-out}
+.animate-combo-burst{animation:comboBurst .65s ease-out}
