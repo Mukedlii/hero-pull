@@ -22,6 +22,12 @@ const ENEMIES = [
   ["Gloomfang", "🐺", 38, 7], ["Mire Troll", "👹", 52, 9], ["Bone Knight", "💀", 68, 11],
   ["Rift Stalker", "🦂", 86, 13], ["Abyss Drake", "🐉", 112, 16], ["The Hollow King", "👑", 150, 19],
 ] as const
+const BOSS_RELICS: Relic[] = [
+  { id: "void-heart", icon: "🖤", name: "Void Heart", text: "+30 maximum HP and heal 30", kind: "health", value: 30 },
+  { id: "infernal-core", icon: "🌋", name: "Infernal Core", text: "+9 Ember Rune damage", kind: "fire", value: 9 },
+  { id: "titan-sigil", icon: "🗿", name: "Titan Sigil", text: "+7 defense", kind: "defense", value: 7 },
+  { id: "king-coffer", icon: "👑", name: "King's Coffer", text: "+10 gold after every victory", kind: "gold", value: 10 },
+]
 const RELICS: Relic[] = [
   { id: "fang", icon: "🐉", name: "Dragon Fang", text: "+4 hero power", kind: "power", value: 4 },
   { id: "heart", icon: "💚", name: "Heartstone", text: "+18 maximum HP and heal 18", kind: "health", value: 18 },
@@ -207,11 +213,15 @@ export default function ArenaBattlePage() {
   }
 
   const winFloor = () => {
+    const reward = enemy.boss ? 12 : 4
     setBusy(false)
     setRolled(false)
     setGuard(0)
+    setWeakened(false)
+    setEnemyStunned(false)
+    setSkillCooldown(0)
     setTeamPower(0)
-    setGold((v) => v + 4 + goldBonus)
+    setGold((v) => v + reward + goldBonus)
     const nextFloor = floor + 1
     setFloor(nextFloor)
     const nextEnemy = enemyFor(nextFloor)
@@ -224,8 +234,8 @@ export default function ArenaBattlePage() {
       setNemesisRune(null)
     }
     setEnemy(nextEnemy)
-    setChoices(shuffle(RELICS).slice(0, 3))
-    addLog("Floor cleared! +" + (4 + goldBonus) + " gold. Choose a relic.")
+    setChoices(shuffle(enemy.boss ? BOSS_RELICS : RELICS).slice(0, 3))
+    addLog((enemy.boss ? "BOSS DEFEATED! " : "Floor cleared! ") + "+" + (reward + goldBonus) + " gold. Choose a relic.")
   }
 
   const useAbility = () => {
