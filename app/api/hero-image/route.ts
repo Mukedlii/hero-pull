@@ -61,7 +61,7 @@ export async function GET(req: NextRequest) {
     return new NextResponse(result, {
       headers: {
         "Content-Type": "image/png",
-        "Cache-Control": "public, max-age=31536000, immutable",
+        "Cache-Control": "no-store, max-age=0, must-revalidate",
       },
     })
   } catch (err: any) {
