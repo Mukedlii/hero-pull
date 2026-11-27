@@ -4,8 +4,8 @@ import { useEffect, useMemo, useState } from "react"
 import { coerceHero, type Hero } from "@/lib/heroes"
 import { getEquippedBonuses, getSetBonus } from "@/lib/items"
 
-type Rune = { id: string; icon: string; name: string; power: number; kind: "strike" | "guard" | "fire" | "heal" | "gold" }
-type Enemy = { name: string; icon: string; hp: number; maxHp: number; attack: number }
+type Rune = { id: string; icon: string; name: string; power: number; kind: "strike" | "guard" | "fire" | "heal" | "gold" | "frost" }
+type Enemy = { name: string; icon: string; hp: number; maxHp: number; attack: number; boss: boolean }
 type Relic = { id: string; icon: string; name: string; text: string; kind: "power" | "health" | "defense" | "gold" | "fire"; value: number }
 
 const HERO_KEY = "hero-pull-current-hero"
@@ -16,11 +16,18 @@ const RUNES: Rune[] = [
   { id: "fire", icon: "🔥", name: "Ember Rune", power: 7, kind: "fire" },
   { id: "heal", icon: "💚", name: "Mender Rune", power: 0, kind: "heal" },
   { id: "gold", icon: "💎", name: "Soul Shard", power: 0, kind: "gold" },
+  { id: "frost", icon: "❄️", name: "Frost Rune", power: 0, kind: "frost" },
 ]
 const ENEMIES = [
   ["Gloomfang", "🐺", 38, 7], ["Mire Troll", "👹", 52, 9], ["Bone Knight", "💀", 68, 11],
   ["Rift Stalker", "🦂", 86, 13], ["Abyss Drake", "🐉", 112, 16], ["The Hollow King", "👑", 150, 19],
 ] as const
+const BOSS_RELICS: Relic[] = [
+  { id: "void-heart", icon: "🖤", name: "Void Heart", text: "+30 maximum HP and heal 30", kind: "health", value: 30 },
+  { id: "infernal-core", icon: "🌋", name: "Infernal Core", text: "+9 Ember Rune damage", kind: "fire", value: 9 },
+  { id: "titan-sigil", icon: "🗿", name: "Titan Sigil", text: "+7 defense", kind: "defense", value: 7 },
+  { id: "king-coffer", icon: "👑", name: "King's Coffer", text: "+10 gold after every victory", kind: "gold", value: 10 },
+]
 const RELICS: Relic[] = [
   { id: "fang", icon: "🐉", name: "Dragon Fang", text: "+4 hero power", kind: "power", value: 4 },
   { id: "heart", icon: "💚", name: "Heartstone", text: "+18 maximum HP and heal 18", kind: "health", value: 18 },
@@ -35,12 +42,23 @@ function int(v: unknown, fallback: number) {
 }
 function enemyFor(floor: number): Enemy {
   const base = ENEMIES[Math.min(floor - 1, ENEMIES.length - 1)]
-  const scale = Math.max(0, floor - ENEMIES.length)
-  const hp = base[2] + scale * 24
-  return { name: base[0], icon: base[1], hp, maxHp: hp, attack: base[3] + Math.floor(scale * 2) }
+  const chapter = Math.floor((floor - 1) / ENEMIES.length)
+  const boss = floor % 5 === 0
+  const bossNames = ["The Hollow King", "Ash Tyrant", "The Rift Maw", "Dread Empress"]
+  const bossIcons = ["👑", "🔥", "🐲", "🧿"]
+  const normalHp = base[2] + chapter * 24
+  const hp = Math.floor(normalHp * (boss ? 1.8 : 1))
+  const attack = Math.floor((base[3] + chapter * 2) * (boss ? 1.35 : 1))
+  const index = (Math.floor(floor / 5) - 1) % bossNames.length
+  return { name: boss ? bossNames[index] : base[0], icon: boss ? bossIcons[index] : base[1], hp, maxHp: hp, attack, boss }
 }
 function shuffle<T,>(items: T[]): T[] {
-  return [...items].sort(() => Math.random() - 0.5)
+  const result = [...items]
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[result[i], result[j]] = [result[j], result[i]]
+  }
+  return result
 }
 
 export default function ArenaBattlePage() {
@@ -59,6 +77,9 @@ export default function ArenaBattlePage() {
   const [spinning, setSpinning] = useState(false)
   const [runes, setRunes] = useState<Rune[]>([])
   const [guard, setGuard] = useState(0)
+  const [weakened, setWeakened] = useState(false)
+  const [enemyStunned, setEnemyStunned] = useState(false)
+  const [skillCooldown, setSkillCooldown] = useState(0)
   const [teamPower, setTeamPower] = useState(0)
   const [relics, setRelics] = useState<Relic[]>([])
   const [choices, setChoices] = useState<Relic[]>([])
@@ -86,7 +107,7 @@ export default function ArenaBattlePage() {
       const saved = localStorage.getItem(PROGRESS_KEY)
       if (saved) {
         const p = JSON.parse(saved)
-        if (Number.isFinite(p.bestFloor)) setLog((prev) => ["Best Rift floor: " + p.bestFloor + ".", ...prev])
+        if (Number.isFinite(p.bestFloor)) setLog((prev) => ["Best Arena floor: " + p.bestFloor + ".", ...prev])
       }
     } catch {
       setHeroError("Could not read the selected hero. Please select it again in Heroes.")
@@ -107,7 +128,7 @@ export default function ArenaBattlePage() {
   const addLog = (line: string) => setLog((old) => [line, ...old].slice(0, 9))
 
   const spin = () => {
-    if (busy || rolled || finished || gold < 2) return
+    if (busy || rolled || finished || choices.length > 0 || gold < 2) return
     setBusy(true)
     setSpinning(true)
     setGold((v) => v - 2)
@@ -123,6 +144,7 @@ export default function ArenaBattlePage() {
         let block = 0
         let heal = 0
         let extraGold = 0
+        let frost = false
         const uses = { ...runeUse }
         result.forEach((r) => {
           if (r.kind === "strike") { damage += r.power; uses.strike = (uses.strike || 0) + 1 }
@@ -130,6 +152,7 @@ export default function ArenaBattlePage() {
           if (r.kind === "guard") block += r.power
           if (r.kind === "heal") heal += 12
           if (r.kind === "gold") extraGold += 3
+          if (r.kind === "frost") frost = true
         })
         let combo = 0
         Object.values(counts).forEach((n) => { if (n >= 2) combo += n === 3 ? 18 : 8 })
@@ -137,6 +160,7 @@ export default function ArenaBattlePage() {
         damage += combo
         setEnemy((e) => ({ ...e, hp: Math.max(0, e.hp - damage) }))
         setGuard(block)
+        setWeakened(frost)
         setHp((v) => Math.min(maxHp, v + heal))
         setGold((v) => v + extraGold)
         setTeamPower(damage)
@@ -145,13 +169,13 @@ export default function ArenaBattlePage() {
         setRolled(true)
         setSpinning(false)
         setBusy(false)
-        addLog("Runes dealt " + damage + " damage" + (combo ? " including " + combo + " combo damage" : "") + (block ? ", gained " + block + " guard" : "") + (heal ? ", restored " + heal + " HP" : "") + (extraGold ? ", found " + extraGold + " gold" : "") + ".")
+        addLog("Runes dealt " + damage + " damage" + (combo ? " including " + combo + " combo damage" : "") + (block ? ", gained " + block + " guard" : "") + (heal ? ", restored " + heal + " HP" : "") + (extraGold ? ", found " + extraGold + " gold" : "") + (frost ? ", Frost weakened the enemy" : "") + ".")
       }
     }, 90)
   }
 
   const battle = () => {
-    if (!rolled || busy || finished) return
+    if (!rolled || busy || finished || choices.length > 0) return
     setBusy(true)
     const afterRuneHp = enemy.hp
     if (afterRuneHp <= 0) {
@@ -168,12 +192,16 @@ export default function ArenaBattlePage() {
       winFloor()
       return
     }
-    const incoming = Math.max(1, enemy.attack - Math.floor(stats.defense * 0.12) - guard)
+    const baseIncoming = Math.max(1, enemy.attack - Math.floor(stats.defense * 0.12) - guard)
+    const incoming = enemyStunned ? 0 : Math.max(1, weakened ? Math.floor(baseIncoming * 0.65) : baseIncoming)
     const nextHp = Math.max(0, hp - incoming)
     setHp(nextHp)
     addLog((crit ? "CRITICAL! " : "") + hero?.name + " strikes for " + damage + ". " + enemy.name + " counters for " + incoming + ".")
     setRolled(false)
     setGuard(0)
+    setWeakened(false)
+    setEnemyStunned(false)
+    setSkillCooldown((value) => Math.max(0, value - 1))
     setTeamPower(0)
     if (nextHp <= 0) {
       setFinished(true)
@@ -185,11 +213,15 @@ export default function ArenaBattlePage() {
   }
 
   const winFloor = () => {
+    const reward = enemy.boss ? 12 : 4
     setBusy(false)
     setRolled(false)
     setGuard(0)
+    setWeakened(false)
+    setEnemyStunned(false)
+    setSkillCooldown(0)
     setTeamPower(0)
-    setGold((v) => v + 4 + goldBonus)
+    setGold((v) => v + reward + goldBonus)
     const nextFloor = floor + 1
     setFloor(nextFloor)
     const nextEnemy = enemyFor(nextFloor)
@@ -202,11 +234,44 @@ export default function ArenaBattlePage() {
       setNemesisRune(null)
     }
     setEnemy(nextEnemy)
-    setChoices(shuffle(RELICS).slice(0, 3))
-    addLog("Floor cleared! +" + (4 + goldBonus) + " gold. Choose a relic.")
+    setChoices(shuffle(enemy.boss ? BOSS_RELICS : RELICS).slice(0, 3))
+    addLog((enemy.boss ? "BOSS DEFEATED! " : "Floor cleared! ") + "+" + (reward + goldBonus) + " gold. Choose a relic.")
+  }
+
+  const useAbility = () => {
+    if (!hero || !rolled || busy || finished || choices.length > 0 || skillCooldown > 0 || enemy.hp <= 0) return
+    const ability = hero.ability.toLowerCase()
+    const isHeal = /heal|healing|oracle|priest|mender/.test(ability)
+    const isShield = /shield|guard|barrier|defen|freeze|prison|time/.test(ability)
+    const isControl = /freeze|prison|time|control|gravity|invisibility|telekinesis/.test(ability)
+    const isDrain = /drain|blood|vampir|reaper/.test(ability)
+    const isFire = /fire|inferno|meteor|plasma|elemental|lightning|thunder|hellfire/.test(ability)
+    const damage = Math.max(8, Math.floor(stats.power * (isFire ? 1.45 : isDrain ? 0.9 : 1.15)))
+    if (isHeal) {
+      const amount = Math.max(12, Math.floor(maxHp * 0.22))
+      setHp((value) => Math.min(maxHp, value + amount))
+      addLog(hero.ability + ": restored " + amount + " HP.")
+    } else if (isShield) {
+      const amount = Math.max(8, Math.floor(stats.defense * 0.7) + 8)
+      setGuard((value) => value + amount)
+      if (isControl) setEnemyStunned(true)
+      addLog(hero.ability + ": gained " + amount + " guard" + (isControl ? " and stunned the enemy" : "") + ".")
+    } else {
+      setEnemy((value) => ({ ...value, hp: Math.max(0, value.hp - damage) }))
+      if (isDrain) {
+        const amount = Math.max(6, Math.floor(damage * 0.35))
+        setHp((value) => Math.min(maxHp, value + amount))
+        addLog(hero.ability + ": dealt " + damage + " damage and drained " + amount + " HP.")
+      } else {
+        if (isControl) setEnemyStunned(true)
+        addLog(hero.ability + ": dealt " + damage + " ability damage" + (isControl ? " and stunned the enemy" : "") + ".")
+      }
+    }
+    setSkillCooldown(2)
   }
 
   const chooseRelic = (r: Relic) => {
+    if (!choices.some((choice) => choice.id === r.id)) return
     setRelics((old) => [...old, r])
     if (r.kind === "power") setPowerBonus((v) => v + r.value)
     if (r.kind === "health") { setMaxHp((v) => v + r.value); setHp((v) => Math.min(maxHp + r.value, v + r.value)) }
@@ -219,7 +284,7 @@ export default function ArenaBattlePage() {
 
   const restart = () => {
     setFloor(1); setGold(8); setRelics([]); setPowerBonus(0); setDefenseBonus(0); setFireBonus(0); setGoldBonus(0)
-    setEnemy(enemyFor(1)); setRolled(false); setSpinning(false); setGuard(0); setTeamPower(0); setNemesisRune(null)
+    setEnemy(enemyFor(1)); setRolled(false); setSpinning(false); setGuard(0); setWeakened(false); setEnemyStunned(false); setSkillCooldown(0); setTeamPower(0); setNemesisRune(null)
     setRuneUse({}); setChoices([]); setFinished(false); setLog(["A new expedition begins."])
     if (hero) { const item = getEquippedBonuses(hero.equippedItems); const set = getSetBonus(hero.equippedItems); const h = Math.min(500, 70 + hero.health * 2 + hero.defense + item.def + set.def); setMaxHp(h); setHp(h) }
   }
@@ -278,7 +343,7 @@ export default function ArenaBattlePage() {
         <div className="flex items-center justify-between"><div><div className="text-[9px] tracking-widest text-red-300">ARENA OPPONENT</div><b>{enemy.name}</b></div><div className="text-4xl">{enemy.icon}</div></div>
         <div className="flex justify-between text-[10px] text-gray-400 mt-3"><span>ENEMY HP</span><span>{enemy.hp}/{enemy.maxHp}</span></div>
         <div className="h-2 rounded-full bg-gray-800 overflow-hidden mt-1"><div className="h-full bg-red-500 transition-all" style={{ width: enemyPercent + "%" }} /></div>
-        <div className="text-[10px] text-gray-500 mt-2">Attack {enemy.attack}{nemesisRune ? " · Nemesis resists your " + (nemesisRune === "strike" ? "Blade" : "Ember") + " rune" : ""}</div>
+        <div className="text-[10px] text-gray-500 mt-2">{enemy.boss ? "☠ BOSS ENCOUNTER · " : ""}Attack {enemy.attack}{nemesisRune ? " · Nemesis resists your " + (nemesisRune === "strike" ? "Blade" : "Ember") + " rune" : ""}{enemyStunned ? " · STUNNED" : ""}{weakened ? " · WEAKENED" : ""}</div>
       </div>
 
       <div className="mt-4 rounded-2xl border border-gray-800 bg-gray-900/80 p-4">
@@ -288,10 +353,11 @@ export default function ArenaBattlePage() {
         </div>
         {nemesisRune && <p className="text-[10px] text-cyan-300 mt-2">Nemesis adaptation active: matching attack rune damage is reduced by 40%.</p>}
         <div className="grid grid-cols-2 gap-2 mt-3">
-          <button disabled={rolled || spinning || finished || gold < 2} onClick={spin} className="rounded-xl py-3 bg-gradient-to-r from-yellow-500 to-amber-600 text-black text-xs font-black disabled:opacity-40">{spinning ? "RUNES SPINNING…" : "✦ SPIN RUNES"}</button>
-          <button disabled={!rolled || spinning || busy || finished} onClick={battle} className="rounded-xl py-3 bg-gradient-to-r from-red-600 to-fuchsia-700 text-white text-xs font-black disabled:opacity-40">⚔ STRIKE</button>
+          <button disabled={rolled || spinning || finished || choices.length > 0 || gold < 2} onClick={spin} className="rounded-xl py-3 bg-gradient-to-r from-yellow-500 to-amber-600 text-black text-xs font-black disabled:opacity-40">{spinning ? "RUNES SPINNING…" : "✦ SPIN RUNES"}</button>
+          <button disabled={!rolled || spinning || busy || finished || choices.length > 0} onClick={battle} className="rounded-xl py-3 bg-gradient-to-r from-red-600 to-fuchsia-700 text-white text-xs font-black disabled:opacity-40">⚔ STRIKE</button>
         </div>
-        <p className="text-[10px] text-gray-500 mt-2">Matching runes trigger combo damage. Guard reduces the enemy counterattack; Mender restores HP.</p>
+        <button disabled={!rolled || spinning || busy || finished || choices.length > 0 || skillCooldown > 0 || enemy.hp <= 0} onClick={useAbility} className="w-full mt-2 rounded-xl border border-cyan-500/40 bg-cyan-950/50 py-3 text-xs font-bold text-cyan-200 disabled:opacity-40">{skillCooldown > 0 ? hero?.ability + " · COOLDOWN " + skillCooldown : "✧ USE HERO ABILITY · " + (hero?.ability || "SPECIAL SKILL")}</button>
+        <p className="text-[10px] text-gray-500 mt-2">Matching runes trigger combo damage. Frost weakens the counterattack; your hero ability adds a tactical skill with a short cooldown.</p>
       </div>
 
       {choices.length > 0 && <div className="mt-4 rounded-2xl border border-yellow-700/50 bg-yellow-950/10 p-4"><h2 className="text-xs font-extrabold text-yellow-300 tracking-widest">VICTORY · CHOOSE A RELIC</h2><div className="grid grid-cols-1 gap-2 mt-3">{choices.map((r) => <button key={r.id} onClick={() => chooseRelic(r)} className="text-left rounded-xl border border-yellow-700/30 bg-gray-950/80 p-3 hover:border-yellow-400"><span className="text-xl mr-2">{r.icon}</span><b className="text-sm">{r.name}</b><div className="text-[10px] text-gray-400 ml-8">{r.text}</div></button>)}</div></div>}
