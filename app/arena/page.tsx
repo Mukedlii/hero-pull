@@ -5,7 +5,7 @@ import { coerceHero, type Hero } from "@/lib/heroes"
 import { getEquippedBonuses, getSetBonus } from "@/lib/items"
 
 type Rune = { id: string; icon: string; name: string; power: number; kind: "strike" | "guard" | "fire" | "heal" | "gold" | "frost" }
-type Enemy = { name: string; icon: string; hp: number; maxHp: number; attack: number; boss: boolean }
+type Enemy = { name: string; icon: string; image: string; hp: number; maxHp: number; attack: number; boss: boolean }
 type Relic = { id: string; icon: string; name: string; text: string; kind: "power" | "health" | "defense" | "gold" | "fire"; value: number }
 
 const HERO_KEY = "hero-pull-current-hero"
@@ -50,7 +50,14 @@ function enemyFor(floor: number): Enemy {
   const hp = Math.floor(normalHp * (boss ? 1.8 : 1))
   const attack = Math.floor((base[3] + chapter * 2) * (boss ? 1.35 : 1))
   const index = (Math.floor(floor / 5) - 1) % bossNames.length
-  return { name: boss ? bossNames[index] : base[0], icon: boss ? bossIcons[index] : base[1], hp, maxHp: hp, attack, boss }
+  const bossImages = ["/enemies/boss_goblin_king.png", "/enemies/boss_hellkeeper.png", "/enemies/boss_shadow_lord.png", "/enemies/boss_final_abyss.png"]
+  const enemyImages = ["/enemies/raider.png", "/enemies/scavenger.png", "/enemies/elite.png", "/enemies/demon_enemy.png", "/enemies/dragon_enemy.png"]
+  return {
+    name: boss ? bossNames[index] : base[0],
+    icon: boss ? bossIcons[index] : base[1],
+    image: boss ? bossImages[index] : enemyImages[(floor - 1) % enemyImages.length],
+    hp, maxHp: hp, attack, boss
+  }
 }
 function shuffle<T,>(items: T[]): T[] {
   const result = [...items]
@@ -327,7 +334,10 @@ export default function ArenaBattlePage() {
 
       <div className="mt-4 rounded-2xl border border-purple-700/60 bg-gradient-to-br from-[#251631] via-gray-900 to-[#101322] p-4 shadow-[0_0_28px_rgba(139,92,246,0.12)]">
         <div className="flex items-center gap-3">
-          <img src={hero?.imageUrl || "/og.png"} alt={hero?.name || "Hero"} className="w-16 h-16 rounded-xl object-cover border border-purple-400/50" />
+          <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-2xl border border-violet-300/40 bg-gradient-to-br from-violet-500/30 via-slate-900 to-fuchsia-950 shadow-[0_0_28px_rgba(139,92,246,0.28)]">
+            <img src={hero?.imageUrl || "/og.png"} alt={hero?.name || "Hero"} className="h-full w-full object-cover" />
+            <div className="absolute inset-x-0 bottom-0 bg-black/70 px-1 py-0.5 text-center text-[8px] font-black tracking-widest text-violet-200">{hero?.rarity?.toUpperCase()}</div>
+          </div>
           <div className="min-w-0 flex-1">
             <div className="text-[9px] tracking-widest text-purple-300">YOUR CHAMPION · {hero?.rarity?.toUpperCase()}</div>
             <b className="block truncate">{hero?.name}</b>
@@ -335,12 +345,33 @@ export default function ArenaBattlePage() {
             <div className="text-[10px] text-gray-300 mt-1">PWR {stats.power} · DEF {stats.defense} · LCK {stats.luck}</div>
           </div>
         </div>
+        {hero?.equippedItems && <div className="mt-3 grid grid-cols-4 gap-1.5">
+          {(["weapon", "shield", "boots", "helmet"] as const).map((slot) => {
+            const item = hero.equippedItems?.[slot]
+            return <div key={slot} className="min-w-0 rounded-lg border border-white/10 bg-black/25 px-1.5 py-2 text-center">
+              <div className="flex h-7 items-center justify-center">
+                {item?.imageUrl ? <img src={item.imageUrl} alt="" className="h-7 w-7 object-contain" /> : <span className="text-lg">{item?.imageEmoji || (slot === "weapon" ? "⚔️" : slot === "shield" ? "🛡️" : slot === "boots" ? "👢" : "⛑️")}</span>}
+              </div>
+              <div className="mt-1 truncate text-[8px] font-bold text-violet-200">{item?.name || slot.toUpperCase()}</div>
+            </div>
+          })}
+        </div>}
         <div className="mt-3 flex justify-between text-[10px] text-gray-400"><span>HERO HP</span><span>{hp}/{maxHp}</span></div>
         <div className="h-2 rounded-full bg-gray-800 overflow-hidden mt-1"><div className="h-full bg-gradient-to-r from-red-600 to-amber-400 transition-all" style={{ width: hpPercent + "%" }} /></div>
       </div>
 
       <div className="mt-4 rounded-2xl border border-red-900/70 bg-gradient-to-br from-[#2a1726] to-gray-950 p-4">
-        <div className="flex items-center justify-between"><div><div className="text-[9px] tracking-widest text-red-300">ARENA OPPONENT</div><b>{enemy.name}</b></div><div className="text-4xl">{enemy.icon}</div></div>
+        <div className="flex items-center gap-3">
+          <div className={`relative h-28 w-28 shrink-0 overflow-hidden rounded-2xl border ${enemy.boss ? "border-amber-400/70 shadow-[0_0_30px_rgba(245,158,11,0.22)]" : "border-red-400/30"} bg-gradient-to-br from-red-950 via-slate-900 to-black`}>
+            <img src={enemy.image} alt={enemy.name} className="h-full w-full object-contain p-1" />
+            {enemy.boss && <span className="absolute bottom-1 left-1 right-1 rounded bg-amber-500/90 px-1 py-0.5 text-center text-[8px] font-black tracking-widest text-black">BOSS</span>}
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="text-[9px] tracking-widest text-red-300">{enemy.boss ? "☠ BOSS ENCOUNTER" : "ARENA OPPONENT"}</div>
+            <b className="block text-lg leading-tight">{enemy.name}</b>
+            <div className="mt-1 text-[10px] text-gray-400">ATK {enemy.attack} · {enemy.boss ? "Elite threat" : "Enemy"}</div>
+          </div>
+        </div>
         <div className="flex justify-between text-[10px] text-gray-400 mt-3"><span>ENEMY HP</span><span>{enemy.hp}/{enemy.maxHp}</span></div>
         <div className="h-2 rounded-full bg-gray-800 overflow-hidden mt-1"><div className="h-full bg-red-500 transition-all" style={{ width: enemyPercent + "%" }} /></div>
         <div className="text-[10px] text-gray-500 mt-2">{enemy.boss ? "☠ BOSS ENCOUNTER · " : ""}Attack {enemy.attack}{nemesisRune ? " · Nemesis resists your " + (nemesisRune === "strike" ? "Blade" : "Ember") + " rune" : ""}{enemyStunned ? " · STUNNED" : ""}{weakened ? " · WEAKENED" : ""}</div>
