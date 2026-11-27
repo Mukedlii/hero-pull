@@ -19,6 +19,7 @@ import {
   type DungeonRoomType,
 } from "@/lib/dungeonConfig"
 import { DEFAULT_DUNGEON_PROGRESS, loadDungeonProgress, saveDungeonProgress, type DungeonProgress } from "@/lib/dungeonProgress"
+import { recordQuestProgress } from "@/lib/quests"
 
 type PotionType = "healing" | "mana" | "elixir"
 
@@ -448,6 +449,8 @@ export default function DungeonPage() {
   }
 
   const persistProgress = async (next: DungeonProgress) => {
+    const bossDelta = Math.max(0, next.total_bosses_killed - progress.total_bosses_killed)
+    if (bossDelta) recordQuestProgress("arena_boss", bossDelta)
     const saved = await saveDungeonProgress(next)
     setProgress(saved.progress)
     setProgressSource(saved.source)
@@ -455,6 +458,7 @@ export default function DungeonPage() {
 
   const startRun = async (startLevel: number, startFloor: number) => {
     if (!hero || !eff) return
+    recordQuestProgress("dungeon_run")
 
     const L = clampLevel(startLevel)
     const F = clampFloor(startFloor)

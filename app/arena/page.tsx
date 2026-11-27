@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { coerceHero, type Hero } from "@/lib/heroes"
 import { getEquippedBonuses, getSetBonus } from "@/lib/items"
+import { recordQuestProgress } from "@/lib/quests"
 
 type Rune = { id: string; icon: string; name: string; power: number; kind: "strike" | "guard" | "fire" | "heal" | "gold" | "frost" }
 type Enemy = { name: string; icon: string; image: string; hp: number; maxHp: number; attack: number; boss: boolean }
@@ -220,6 +221,8 @@ export default function ArenaBattlePage() {
   }
 
   const winFloor = () => {
+    recordQuestProgress("arena_win")
+    if (enemy.boss) recordQuestProgress("arena_boss")
     const reward = enemy.boss ? 12 : 4
     setBusy(false)
     setRolled(false)
@@ -247,6 +250,7 @@ export default function ArenaBattlePage() {
 
   const useAbility = () => {
     if (!hero || !rolled || busy || finished || choices.length > 0 || skillCooldown > 0 || enemy.hp <= 0) return
+    recordQuestProgress("hero_ability")
     const ability = hero.ability.toLowerCase()
     const isHeal = /heal|healing|oracle|priest|mender/.test(ability)
     const isShield = /shield|guard|barrier|defen|freeze|prison|time/.test(ability)
@@ -320,6 +324,7 @@ export default function ArenaBattlePage() {
     <div className="px-4 pb-28 pt-5">
       <div className="flex items-center justify-between gap-2">
         <a href="/collection" className="text-xs text-gray-400 underline">← Heroes</a>
+        <a href="/quests" className="text-xs text-amber-300 underline">Quests →</a>
         <a href="/pvp" className="text-xs text-fuchsia-300 underline">Live PvP →</a>
         <span className="text-[10px] tracking-[2px] text-purple-300 font-extrabold">ARENA · RUNE COMBAT</span>
       </div>
