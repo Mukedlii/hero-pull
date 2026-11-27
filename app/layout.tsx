@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   applicationName: "Hero Pull",
   manifest: "/manifest.json",
   appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Hero Pull" },
-  icons: { icon: "/icon.png", apple: "/icon.png" },
+  icons: { icon: "/icon.svg", apple: "/icon.svg" },
   openGraph: {
     title: "Hero Pull — Build Your Legend",
     description: "Collect powerful heroes, master your gear, and conquer the arena.",
