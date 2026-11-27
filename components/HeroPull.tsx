@@ -152,6 +152,10 @@ export default function HeroPull() {
           <div className="text-2xl">🏰</div><div className="mt-2 font-black">Dungeon</div><div className="mt-1 text-xs text-slate-400">Explore and defeat bosses</div>
         </a>
       </div>
+      <div className="mt-3 grid w-full grid-cols-2 gap-3">
+        <a href="/season" className="rounded-2xl border border-violet-400/25 bg-gradient-to-br from-violet-950/70 to-slate-950 p-4 transition hover:border-violet-400/50"><div className="text-2xl">🎖️</div><div className="mt-2 font-black">Season & Quests</div><div className="mt-1 text-xs text-slate-400">Daily and weekly challenges</div></a>
+        <a href="/guilds" className="rounded-2xl border border-amber-400/25 bg-gradient-to-br from-amber-950/60 to-slate-950 p-4 transition hover:border-amber-400/50"><div className="text-2xl">🛡️</div><div className="mt-2 font-black">Guild Hall</div><div className="mt-1 text-xs text-slate-400">Community and guild rankings</div></a>
+      </div>
 
     </div>
   )

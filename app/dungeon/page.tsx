@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import frameSdk from "@farcaster/frame-sdk"
 import { coerceHero, type Hero } from "@/lib/heroes"
+import { recordLiveEvent } from "@/lib/liveOps"
 import LoadingDots from "@/components/LoadingDots"
 import type { EquippedItems, Item, ItemRarity, ItemSlot } from "@/lib/items"
 import { FULL_SET_BONUS, generateItem, getEquippedBonuses, getSetBonus } from "@/lib/items"
@@ -388,6 +389,8 @@ export default function DungeonPage() {
   const [inBattle, setInBattle] = useState(false)
   const [playerTurn, setPlayerTurn] = useState(true)
   const [defending, setDefending] = useState(false)
+  const [bossPhase, setBossPhase] = useState(1)
+  const [bossTurns, setBossTurns] = useState(0)
 
   const [log, setLog] = useState<string[]>([])
   const [loot, setLoot] = useState<Item | null>(null)
@@ -514,8 +517,9 @@ export default function DungeonPage() {
       beginBattle(true)
       return
     }
-    if (t === "battle") {
+    if (t === "battle" || t === "ambush") {
       beginBattle(false)
+      if (t === "ambush") appendLog("⚠️ AMBUSH! The enemy gets a surprise strike.")
       return
     }
 
@@ -563,6 +567,16 @@ export default function DungeonPage() {
       appendLog("⚠️ Trap detected.")
       return
     }
+    if (t === "cursed") {
+      const damage = Math.max(5, Math.floor(playerMaxHp * 0.12))
+      setPlayerHp((hp) => Math.max(1, hp - damage))
+      const bonus = clampInt(randInt(18, 30) + floor * 2, 0, 999)
+      setRunGold((g) => g + bonus)
+      try { saveGold(loadGold() + bonus) } catch {}
+      awardScore(35 + level * 3)
+      appendLog("🩸 CURSED ALTAR: -" + damage + " HP, +" + bonus + " gold and bonus score.")
+      return
+    }
 
     // blessing
     appendLog("🌟 A shrine hums with power.")
@@ -578,6 +592,8 @@ export default function DungeonPage() {
     if (!eff) return
     const e = enemyFromLevel(level, floor, boss)
     setEnemy(e)
+    setBossPhase(1)
+    setBossTurns(0)
     setInBattle(true)
     setDefending(false)
     setLoot(null)
@@ -597,7 +613,11 @@ export default function DungeonPage() {
 
     const heroDef = eff.total.def
     const critChance = 0.08
-    const { dmg, crit } = calcDamage(e.atk, heroDef * (defending ? 1.6 : 1), critChance, 1.7)
+    const nextBossTurns = e.boss ? bossTurns + 1 : 0
+    if (e.boss) setBossTurns(nextBossTurns)
+    const telegraph = e.boss && nextBossTurns % 3 === 0
+    const attackPower = Math.floor(e.atk * (telegraph ? 1.75 : 1))
+    const { dmg, crit } = calcDamage(attackPower, heroDef * (defending ? 1.6 : 1), critChance, 1.7)
 
     setDefending(false)
 
@@ -620,6 +640,8 @@ export default function DungeonPage() {
   }
 
   const endBattleWin = async (e: Enemy) => {
+    recordLiveEvent(e.boss ? "boss_kill" : "floor_clear")
+    if (e.boss) recordLiveEvent("dungeon_clear")
     setInBattle(false)
     setEnemy(null)
     setDefending(false)
@@ -719,6 +741,13 @@ export default function DungeonPage() {
     const { dmg, crit } = calcDamage(heroPwr, enemy.def, critChance, 1.9)
 
     const nextEnemyHp = Math.max(0, enemy.hp - dmg)
+    if (enemy.boss && bossPhase === 1 && nextEnemyHp > 0 && nextEnemyHp <= enemy.maxHp * 0.5) {
+      setBossPhase(2)
+      const healedHp = Math.min(enemy.maxHp, nextEnemyHp + Math.floor(enemy.maxHp * 0.08))
+      setEnemy({ ...enemy, hp: healedHp, atk: Math.floor(enemy.atk * 1.25), def: Math.floor(enemy.def * 1.15) })
+      appendLog("🔥 BOSS PHASE 2 · ENRAGED! +25% ATK, +15% DEF, recovered 8% HP.")
+      return
+    }
     setEnemy({ ...enemy, hp: nextEnemyHp })
     appendLog(crit ? `💥 CRITICAL! x1.9 — You hit for ${dmg}.` : `⚔️ You attack for ${dmg}.`)
 
@@ -755,6 +784,13 @@ export default function DungeonPage() {
     const dmg = Math.max(1, base - Math.floor(enemy.def * 0.06))
 
     const nextEnemyHp = Math.max(0, enemy.hp - dmg)
+    if (enemy.boss && bossPhase === 1 && nextEnemyHp > 0 && nextEnemyHp <= enemy.maxHp * 0.5) {
+      setBossPhase(2)
+      const healedHp = Math.min(enemy.maxHp, nextEnemyHp + Math.floor(enemy.maxHp * 0.08))
+      setEnemy({ ...enemy, hp: healedHp, atk: Math.floor(enemy.atk * 1.25), def: Math.floor(enemy.def * 1.15) })
+      appendLog("🔥 BOSS PHASE 2 · ENRAGED! +25% ATK, +15% DEF, recovered 8% HP.")
+      return
+    }
     setEnemy({ ...enemy, hp: nextEnemyHp })
     appendLog(`✨ ${hero?.ability || "Skill"}! You deal ${dmg}.`)
 
@@ -1271,12 +1307,12 @@ export default function DungeonPage() {
         <div className="mt-6 border border-gray-800 bg-gray-900 rounded-2xl p-4">
           <div className="flex items-center justify-between">
             <div className="font-extrabold">
-              {room === "battle" ? "⚔️ Battle" : room === "boss" ? "🐉 Boss" : room === "treasure" ? "💰 Treasure" : room === "shop" ? "🏪 Shop" : room === "trap" ? "⚠️ Trap" : "🌟 Shrine"}
+              {room === "battle" || room === "ambush" ? (room === "ambush" ? "⚠️ Ambush" : "⚔️ Battle") : room === "cursed" ? "🩸 Cursed Altar" : room === "boss" ? "🐉 Boss" : room === "treasure" ? "💰 Treasure" : room === "shop" ? "🏪 Shop" : room === "trap" ? "⚠️ Trap" : "🌟 Shrine"}
             </div>
             <div className="text-xs text-gray-500">Depth {depth}/100</div>
           </div>
 
-          {(room === "battle" || room === "boss") && enemy ? (
+          {(room === "battle" || room === "ambush" || room === "boss") && enemy ? (
             <div className="mt-3">
               <div className="flex items-center justify-between border border-gray-800 rounded-xl p-3 bg-gray-950/30">
                 <div className="flex items-center gap-3">
@@ -1330,7 +1366,7 @@ export default function DungeonPage() {
             </div>
           ) : null}
 
-          {(room === "battle" || room === "boss") && !enemy && !inBattle ? (
+          {(room === "battle" || room === "ambush" || room === "boss") && !enemy && !inBattle ? (
             <div className="mt-3">
               <div className="text-xs text-gray-400">Enemy defeated.</div>
               <button onClick={() => nextFloor().catch(() => {})} className="mt-3 w-full bg-yellow-600 hover:bg-yellow-500 text-white font-extrabold py-3 rounded-xl">
