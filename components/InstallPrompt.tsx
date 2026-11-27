@@ -13,6 +13,9 @@ export default function InstallPrompt() {
   const [show, setShow] = useState(false)
 
   useEffect(() => {
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js").catch((error) => console.error("Service worker registration failed", error))
+    }
     if (window.matchMedia("(display-mode: standalone)").matches || (navigator as Navigator & { standalone?: boolean }).standalone) return
     const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent)
     setIos(isIos)
@@ -24,9 +27,6 @@ export default function InstallPrompt() {
     }
     window.addEventListener("beforeinstallprompt", onPrompt)
     if (isIos) setShow(true)
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js").catch((error) => console.error("Service worker registration failed", error))
-    }
     return () => window.removeEventListener("beforeinstallprompt", onPrompt)
   }, [])
 
