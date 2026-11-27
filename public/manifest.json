@@ -11,6 +11,6 @@
   "theme_color": "#090914",
   "categories": ["games", "entertainment"],
   "icons": [
-    { "src": "/icon.png", "sizes": "any", "type": "image/png", "purpose": "any maskable" }
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
   ]
 }
