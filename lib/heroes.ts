@@ -37,7 +37,13 @@ export function coerceHero(raw: any): Hero | null {
   const name = typeof raw.name === "string" ? raw.name : "Hero"
   const rarity = (raw.rarity as Hero["rarity"]) || "Common"
   const gender = (raw.gender as Hero["gender"]) || "Unknown"
-  const imageUrl = typeof raw.imageUrl === "string" ? raw.imageUrl : "/og.png"
+  const storedImageUrl = typeof raw.imageUrl === "string" ? raw.imageUrl : ""
+  // Older saves sometimes stored the generic social banner as a hero portrait.
+  const portraitName = name.toLowerCase().trim().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "")
+  const portraitFallback = `/heroes/${portraitName}.png`
+  const imageUrl = !storedImageUrl || storedImageUrl === "/og.png" || storedImageUrl.endsWith("/og.png")
+    ? portraitFallback
+    : storedImageUrl
 
   // New shape
   const hasNewStats = raw.health != null || raw.luck != null || raw.ability != null

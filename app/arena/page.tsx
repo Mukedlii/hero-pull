@@ -334,7 +334,7 @@ export default function ArenaBattlePage() {
 
       <div className="mt-4 rounded-2xl border border-purple-700/60 bg-gradient-to-br from-[#251631] via-gray-900 to-[#101322] p-4 shadow-[0_0_28px_rgba(139,92,246,0.12)]">
         <div className="flex items-center gap-3">
-          <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-2xl border border-violet-300/40 bg-gradient-to-br from-violet-500/30 via-slate-900 to-fuchsia-950 shadow-[0_0_28px_rgba(139,92,246,0.28)]">
+          <div className="relative h-32 w-32 shrink-0 overflow-hidden rounded-2xl border border-violet-300/40 bg-gradient-to-br from-violet-500/30 via-slate-900 to-fuchsia-950 shadow-[0_0_28px_rgba(139,92,246,0.28)]">
             <img src={hero?.imageUrl || "/og.png"} alt={hero?.name || "Hero"} className="h-full w-full object-cover" />
             <div className="absolute inset-x-0 bottom-0 bg-black/70 px-1 py-0.5 text-center text-[8px] font-black tracking-widest text-violet-200">{hero?.rarity?.toUpperCase()}</div>
           </div>
