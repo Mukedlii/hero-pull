@@ -1,0 +1,16 @@
+{
+  "id": "/",
+  "name": "Hero Pull — Build Your Legend",
+  "short_name": "Hero Pull",
+  "description": "Collect powerful heroes, master your gear, and conquer the arena.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#070711",
+  "theme_color": "#090914",
+  "categories": ["games", "entertainment"],
+  "icons": [
+    { "src": "/icon.png", "sizes": "any", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
