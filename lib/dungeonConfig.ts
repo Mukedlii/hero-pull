@@ -1,6 +1,6 @@
 import type { ItemRarity } from "@/lib/items"
 
-export type DungeonRoomType = "battle" | "treasure" | "shop" | "trap" | "blessing" | "boss"
+export type DungeonRoomType = "battle" | "treasure" | "shop" | "trap" | "blessing" | "boss" | "ambush" | "cursed"
 
 type Range = [number, number]
 
@@ -170,6 +170,8 @@ export function randInt(min: number, max: number) {
 export function roomWeightsForFloor(floor: number): Array<{ type: DungeonRoomType; w: number }> {
   if (floor >= 10) return [{ type: "boss", w: 1 }]
   if (floor <= 3) return [
+    { type: "ambush", w: 6 },
+    { type: "cursed", w: 4 },
     { type: "battle", w: 35 },
     { type: "treasure", w: 30 },
     { type: "shop", w: 15 },
@@ -177,6 +179,8 @@ export function roomWeightsForFloor(floor: number): Array<{ type: DungeonRoomTyp
     { type: "blessing", w: 10 },
   ]
   if (floor <= 6) return [
+    { type: "ambush", w: 8 },
+    { type: "cursed", w: 7 },
     { type: "battle", w: 50 },
     { type: "treasure", w: 20 },
     { type: "shop", w: 15 },
@@ -184,6 +188,8 @@ export function roomWeightsForFloor(floor: number): Array<{ type: DungeonRoomTyp
     { type: "blessing", w: 5 },
   ]
   return [
+    { type: "ambush", w: 10 },
+    { type: "cursed", w: 10 },
     { type: "battle", w: 65 },
     { type: "treasure", w: 15 },
     { type: "shop", w: 10 },
