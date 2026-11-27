@@ -107,7 +107,7 @@ export default function ArenaBattlePage() {
       const saved = localStorage.getItem(PROGRESS_KEY)
       if (saved) {
         const p = JSON.parse(saved)
-        if (Number.isFinite(p.bestFloor)) setLog((prev) => ["Best Rift floor: " + p.bestFloor + ".", ...prev])
+        if (Number.isFinite(p.bestFloor)) setLog((prev) => ["Best Arena floor: " + p.bestFloor + ".", ...prev])
       }
     } catch {
       setHeroError("Could not read the selected hero. Please select it again in Heroes.")
