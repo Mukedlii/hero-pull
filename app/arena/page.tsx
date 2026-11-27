@@ -107,7 +107,7 @@ export default function ArenaBattlePage() {
   const addLog = (line: string) => setLog((old) => [line, ...old].slice(0, 9))
 
   const spin = () => {
-    if (busy || rolled || finished || gold < 2) return
+    if (busy || rolled || finished || choices.length > 0 || gold < 2) return
     setBusy(true)
     setSpinning(true)
     setGold((v) => v - 2)
@@ -151,7 +151,7 @@ export default function ArenaBattlePage() {
   }
 
   const battle = () => {
-    if (!rolled || busy || finished) return
+    if (!rolled || busy || finished || choices.length > 0) return
     setBusy(true)
     const afterRuneHp = enemy.hp
     if (afterRuneHp <= 0) {
@@ -207,6 +207,7 @@ export default function ArenaBattlePage() {
   }
 
   const chooseRelic = (r: Relic) => {
+    if (!choices.some((choice) => choice.id === r.id)) return
     setRelics((old) => [...old, r])
     if (r.kind === "power") setPowerBonus((v) => v + r.value)
     if (r.kind === "health") { setMaxHp((v) => v + r.value); setHp((v) => Math.min(maxHp + r.value, v + r.value)) }
@@ -288,8 +289,8 @@ export default function ArenaBattlePage() {
         </div>
         {nemesisRune && <p className="text-[10px] text-cyan-300 mt-2">Nemesis adaptation active: matching attack rune damage is reduced by 40%.</p>}
         <div className="grid grid-cols-2 gap-2 mt-3">
-          <button disabled={rolled || spinning || finished || gold < 2} onClick={spin} className="rounded-xl py-3 bg-gradient-to-r from-yellow-500 to-amber-600 text-black text-xs font-black disabled:opacity-40">{spinning ? "RUNES SPINNING…" : "✦ SPIN RUNES"}</button>
-          <button disabled={!rolled || spinning || busy || finished} onClick={battle} className="rounded-xl py-3 bg-gradient-to-r from-red-600 to-fuchsia-700 text-white text-xs font-black disabled:opacity-40">⚔ STRIKE</button>
+          <button disabled={rolled || spinning || finished || choices.length > 0 || gold < 2} onClick={spin} className="rounded-xl py-3 bg-gradient-to-r from-yellow-500 to-amber-600 text-black text-xs font-black disabled:opacity-40">{spinning ? "RUNES SPINNING…" : "✦ SPIN RUNES"}</button>
+          <button disabled={!rolled || spinning || busy || finished || choices.length > 0} onClick={battle} className="rounded-xl py-3 bg-gradient-to-r from-red-600 to-fuchsia-700 text-white text-xs font-black disabled:opacity-40">⚔ STRIKE</button>
         </div>
         <p className="text-[10px] text-gray-500 mt-2">Matching runes trigger combo damage. Guard reduces the enemy counterattack; Mender restores HP.</p>
       </div>
