@@ -47,7 +47,7 @@ export default function InstallPrompt() {
   return (
     <aside className="fixed bottom-20 left-3 right-3 z-[60] mx-auto max-w-md rounded-2xl border border-violet-400/30 bg-[#171326] p-4 shadow-2xl shadow-black/50 md:bottom-5 md:left-auto md:right-5">
       <div className="flex items-start gap-3">
-        <img src="/icon.png" alt="" className="h-12 w-12 rounded-xl" />
+        <img src="/icon.svg" alt="" className="h-12 w-12 rounded-xl" />
         <div className="min-w-0 flex-1">
           <p className="font-bold text-white">Install Hero Pull</p>
           {ios ? (

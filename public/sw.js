@@ -1,5 +1,5 @@
 const CACHE_NAME = "hero-pull-shell-v1"
-const SHELL_URLS = ["/offline", "/icon.png"]
+const SHELL_URLS = ["/offline", "/icon.svg"]
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -32,7 +32,7 @@ self.addEventListener("fetch", (event) => {
     return
   }
 
-  if (url.pathname === "/icon.png" || url.pathname === "/manifest.json") {
+  if (url.pathname === "/icon.svg" || url.pathname === "/manifest.json") {
     event.respondWith(
       caches.match(request).then((cached) => cached || fetch(request).then((response) => {
         const copy = response.clone()
