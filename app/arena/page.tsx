@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { coerceHero, type Hero } from "@/lib/heroes"
 import { getEquippedBonuses, getSetBonus } from "@/lib/items"
+import { recordQuestEvent } from "@/lib/quests"
 
 type Rune = { id: string; icon: string; name: string; power: number; kind: "strike" | "guard" | "fire" | "heal" | "gold" | "frost" }
 type Enemy = { name: string; icon: string; image: string; hp: number; maxHp: number; attack: number; boss: boolean }
