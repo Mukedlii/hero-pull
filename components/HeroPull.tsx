@@ -1,166 +1,160 @@
 "use client"
 
-import { useEffect, useState } from 'react'
-import { generateHero, Hero } from '@/lib/heroes'
-import MintButton from './MintButton'
+import { useEffect, useState } from "react"
+import { coerceHero, generateHero, type Hero } from "@/lib/heroes"
+
+const COLLECTION_KEY = "hero-pull-collection"
+const CURRENT_HERO_KEY = "hero-pull-current-hero"
+const LAST_FREE_KEY = "hero-pull-last-free"
+
+function readCollection(): Hero[] {
+  try {
+    const raw = localStorage.getItem(COLLECTION_KEY)
+    const parsed = raw ? JSON.parse(raw) : []
+    return Array.isArray(parsed) ? parsed.map(coerceHero).filter(Boolean) as Hero[] : []
+  } catch {
+    return []
+  }
+}
+
+function savePulledHero(hero: Hero) {
+  const collection = readCollection()
+  collection.unshift(hero)
+  localStorage.setItem(COLLECTION_KEY, JSON.stringify(collection.slice(0, 500)))
+  localStorage.setItem(CURRENT_HERO_KEY, JSON.stringify(hero))
+}
 
 export default function HeroPull() {
   const [hero, setHero] = useState<Hero | null>(null)
-  const [isFreeAvailable, setFreeAvailable] = useState(true)
+  const [isFreeAvailable, setFreeAvailable] = useState(false)
   const [isRevealing, setIsRevealing] = useState(false)
-  const [hasShared, setHasShared] = useState(false)
+  const [collectionCount, setCollectionCount] = useState(0)
+  const [shareStatus, setShareStatus] = useState("")
 
   useEffect(() => {
-    const initSDK = async () => {
-      try {
-        const { sdk } = await import('@farcaster/frame-sdk')
-        await sdk.actions.ready()
-      } catch (e) {
-        console.log('Not in Farcaster context')
-      }
-    }
-    initSDK()
     const today = new Date().toDateString()
-    const last = localStorage.getItem('hero-pull-last-free')
-    setFreeAvailable(last !== today)
+    setFreeAvailable(localStorage.getItem(LAST_FREE_KEY) !== today)
+    setCollectionCount(readCollection().length)
+    try {
+      const current = localStorage.getItem(CURRENT_HERO_KEY)
+      if (current) setHero(coerceHero(JSON.parse(current)))
+    } catch {
+      setHero(null)
+    }
   }, [])
 
   const handlePull = async () => {
+    if (!isFreeAvailable || isRevealing) return
     setIsRevealing(true)
-    await new Promise(r => setTimeout(r, 800))
-    const newHero = generateHero()
-    setHero(newHero)
-    setHasShared(false)
-
-    // No localStorage hero saving. Heroes live on-chain via wallet NFTs (mint to keep).
-
-    const today = new Date().toDateString()
-    localStorage.setItem('hero-pull-last-free', today)
-    setFreeAvailable(false)
-    setIsRevealing(false)
+    await new Promise(resolve => setTimeout(resolve, 850))
+    const nextHero = generateHero()
+    try {
+      savePulledHero(nextHero)
+      localStorage.setItem(LAST_FREE_KEY, new Date().toDateString())
+      setCollectionCount(readCollection().length)
+      setFreeAvailable(false)
+      setHero(nextHero)
+    } catch {
+      setShareStatus("Could not save your hero. Check your browser storage.")
+    } finally {
+      setIsRevealing(false)
+    }
   }
 
   const handleShare = async () => {
     if (!hero) return
-    const text = `I pulled a ${hero.rarity} hero in Hero Pull! ⚔️\n\n${hero.name}\n❤️${hero.health} ⚔️${hero.power} 🛡️${hero.defense} 🍀${hero.luck}\n\nPlay here 👇`
-    const frameUrl = 'https://hero-pull.vercel.app'
-    const url = `https://warpcast.com/~/compose?text=${encodeURIComponent(text)}&embeds[]=${encodeURIComponent(frameUrl)}`
-
-    // Mark as shared immediately after user initiates sharing (best-effort gating)
-    setHasShared(true)
-
-    // Best-effort server event (FID-based). If not in FC context, this will no-op.
-    ;(async () => {
-      try {
-        const { sdk } = await import('@farcaster/frame-sdk')
-        const ctx: any = await sdk.context
-        const fid = ctx?.user?.fid
-        if (!fid) return
-        await fetch('/api/event', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ fid, action: 'share' }),
-        })
-      } catch {
-        // ignore
-      }
-    })()
-
-    // In Warpcast, prefer SDK openUrl so it opens in-app (otherwise iOS may show Farcaster download page)
+    const text = `I pulled a ${hero.rarity} hero in Hero Pull! ⚔️ ${hero.name} — HP ${hero.health}, PWR ${hero.power}, DEF ${hero.defense}, LCK ${hero.luck}.`
     try {
-      const { sdk } = await import('@farcaster/frame-sdk')
-      await sdk.actions.openUrl(url)
-      return
+      if (navigator.share) {
+        await navigator.share({ title: "Hero Pull", text, url: window.location.origin })
+        setShareStatus("Share opened.")
+      } else {
+        await navigator.clipboard.writeText(`${text} Play: ${window.location.origin}`)
+        setShareStatus("Hero details copied.")
+      }
     } catch {
-      // fallback
+      setShareStatus("Share cancelled.")
     }
-
-    window.open(url, '_blank')
   }
 
   const rarityColors: Record<string, string> = {
-    Common: 'border-gray-400 glow-common',
-    Rare: 'border-blue-500 glow-rare',
-    Epic: 'border-purple-500 glow-epic',
-    Legendary: 'border-yellow-400 glow-legendary',
+    Common: "border-gray-400 shadow-gray-500/20",
+    Rare: "border-blue-500 shadow-blue-500/30",
+    Epic: "border-purple-500 shadow-purple-500/30",
+    Legendary: "border-yellow-400 shadow-yellow-400/40",
   }
 
   return (
-    <div className="flex flex-col items-center gap-6 mt-8 px-4 pb-16">
-      <div className="text-center">
-        <h1 className="text-4xl font-extrabold bg-gradient-to-r from-purple-400 to-yellow-400 bg-clip-text text-transparent">
-          Hero Pull
-        </h1>
-        <p className="text-gray-400 mt-1 text-sm">Pull a random superhero NFT on Base</p>
+    <div className="relative flex flex-col items-center gap-5 px-4 pt-7 pb-28">
+      <div className="absolute inset-x-0 top-0 -z-10 h-80 bg-[radial-gradient(ellipse_at_top,rgba(124,58,237,0.28),transparent_68%)]" />
+      <div className="w-full text-center">
+        <p className="text-[10px] font-black uppercase tracking-[0.35em] text-violet-300">Collect · Equip · Conquer</p>
+        <h1 className="mt-2 text-5xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-violet-300 via-fuchsia-200 to-amber-200">HERO PULL</h1>
+        <p className="mt-2 text-sm text-slate-400">Build your squad. Enter the arena. Become a legend.</p>
       </div>
 
-      {!hero && (
-        <>
-          {isFreeAvailable ? (
-            <button
-              onClick={handlePull}
-              disabled={isRevealing}
-              className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold py-4 px-10 rounded-2xl shadow-lg text-lg transition-all disabled:opacity-60"
-            >
-              {isRevealing ? 'Revealing...' : 'Pull Hero (FREE)'}
-            </button>
-          ) : (
-            <MintButton onPulled={(h) => setHero(h)} />
-          )}
-        </>
-      )}
-
-      {isRevealing && <div className="text-4xl animate-bounce">🎴</div>}
-
-      {hero && !isRevealing && (
-        <div className={`relative w-80 p-5 rounded-2xl border-2 text-center bg-gray-900 ${rarityColors[hero.rarity]}`}>
-          <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gray-800 px-3 py-1 rounded-full text-xs font-bold border border-gray-600">
-            {hero.rarity}
-          </div>
-          <img
-            src={hero.imageUrl}
-            alt={hero.name}
-            className="w-36 h-36 rounded-xl mx-auto mb-3 object-cover"
-            onError={(e) => {
-              const seed = encodeURIComponent(hero.name)
-              e.currentTarget.src = `https://api.dicebear.com/7.x/adventurer/svg?seed=${seed}`
-            }}
-          />
-          <h2 className="text-2xl font-extrabold mb-2">{hero.name}</h2>
-          <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm mx-auto w-fit">
-            <div className="text-left"><span className="text-red-400">❤️</span> HP: <span className="font-bold text-white">{hero.health}</span></div>
-            <div className="text-left"><span className="text-orange-400">⚔️</span> PWR: <span className="font-bold text-white">{hero.power}</span></div>
-            <div className="text-left"><span className="text-blue-400">🛡️</span> DEF: <span className="font-bold text-white">{hero.defense}</span></div>
-            <div className="text-left"><span className="text-green-400">🍀</span> LCK: <span className="font-bold text-white">{hero.luck}</span></div>
-          </div>
-          <p className="text-gray-400 text-xs mt-2">{hero.gender} • {hero.ability}</p>
-          {hero.rarity === 'Legendary' && (
-            <p className="text-yellow-400 text-xs font-bold mt-2 animate-pulse">
-              LEGENDARY! Mint this as NFT!
-            </p>
-          )}
+      <div className="grid w-full grid-cols-3 gap-2">
+        <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3 text-center">
+          <div className="text-xl font-black text-white">{collectionCount}</div>
+          <div className="text-[10px] uppercase tracking-wider text-slate-500">Heroes</div>
         </div>
-      )}
+        <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3 text-center">
+          <div className="text-xl font-black text-white">4</div>
+          <div className="text-[10px] uppercase tracking-wider text-slate-500">Stats</div>
+        </div>
+        <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3 text-center">
+          <div className="text-xl font-black text-white">∞</div>
+          <div className="text-[10px] uppercase tracking-wider text-slate-500">Battles</div>
+        </div>
+      </div>
 
-      {hero && !isRevealing && (
-        <div className="flex flex-col items-center gap-3">
-          <button
-            onClick={handleShare}
-            className="bg-purple-700 hover:bg-purple-600 text-white py-2 px-6 rounded-xl text-sm font-semibold flex items-center gap-2"
-          >
-            <span>Share on Warpcast</span>
-            {hasShared && <span className="text-green-400 text-base">✓</span>}
+      {!hero ? (
+        <div className="w-full rounded-3xl border border-violet-400/20 bg-gradient-to-b from-violet-950/60 to-slate-950 p-6 text-center shadow-2xl shadow-violet-950/40">
+          <div className="mx-auto mb-4 flex h-36 w-36 items-center justify-center rounded-full border border-violet-300/20 bg-[radial-gradient(circle,rgba(167,139,250,0.24),rgba(15,23,42,0.2)_65%)]">
+            <span className="text-7xl drop-shadow-[0_0_24px_rgba(167,139,250,0.7)]">✦</span>
+          </div>
+          <h2 className="text-2xl font-black">Your legend begins here</h2>
+          <p className="mt-2 text-sm text-slate-400">Open your first hero pack and start building your collection.</p>
+          <button onClick={handlePull} disabled={!isFreeAvailable || isRevealing} className="mt-6 w-full rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-6 py-4 text-base font-black text-white shadow-lg shadow-violet-900/40 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50">
+            {isRevealing ? "REVEALING…" : isFreeAvailable ? "✦ OPEN FREE HERO PACK" : "FREE PACK ALREADY CLAIMED"}
           </button>
-
-          <MintButton onPulled={(h) => setHero(h)} />
+          {!isFreeAvailable && <p className="mt-3 text-xs text-slate-500">Your next free pack is available tomorrow.</p>}
+        </div>
+      ) : (
+        <div className={`w-full overflow-hidden rounded-3xl border-2 bg-gradient-to-b from-slate-900 to-slate-950 p-5 text-center shadow-2xl ${rarityColors[hero.rarity] || rarityColors.Common}`}>
+          <div className="mb-3 inline-flex rounded-full border border-white/10 bg-black/40 px-4 py-1 text-[10px] font-black uppercase tracking-[0.25em] text-slate-200">{hero.rarity}</div>
+          <div className="relative mx-auto mb-4 aspect-square w-56 overflow-hidden rounded-2xl border border-white/10 bg-slate-800 shadow-xl">
+            <img src={hero.imageUrl} alt={hero.name} className="h-full w-full object-contain" onError={e => { e.currentTarget.src = "/og.png" }} />
+          </div>
+          <h2 className="text-2xl font-black">{hero.name}</h2>
+          <p className="mt-1 text-xs text-slate-400">{hero.gender} · {hero.ability}</p>
+          <div className="mx-auto mt-5 grid max-w-xs grid-cols-2 gap-2 text-sm">
+            {[[ "HP", hero.health, "text-rose-300" ], [ "PWR", hero.power, "text-orange-300" ], [ "DEF", hero.defense, "text-sky-300" ], [ "LCK", hero.luck, "text-emerald-300" ]].map(([label, value, color]) => (
+              <div key={String(label)} className="rounded-lg border border-white/10 bg-black/30 p-3">
+                <span className={`font-bold ${color}`}>{label}</span><span className="ml-2 font-black text-white">{value}</span>
+              </div>
+            ))}
+          </div>
+          <div className="mt-5 grid grid-cols-2 gap-2">
+            <button onClick={handleShare} className="rounded-xl border border-white/15 bg-white/5 py-3 text-sm font-bold hover:bg-white/10">Share hero</button>
+            <a href="/collection" className="rounded-xl bg-violet-600 py-3 text-sm font-bold text-white hover:bg-violet-500">My collection</a>
+          </div>
+          {shareStatus && <p className="mt-2 text-xs text-slate-400">{shareStatus}</p>}
+          <p className="mt-4 text-[11px] text-slate-500">This hero is saved to your collection and selected as your active hero.</p>
         </div>
       )}
 
-      {hero && !isFreeAvailable && (
-        <p className="text-gray-500 text-xs text-center">
-          Free pull resets daily. Extra pulls cost 0.00020 ETH
-        </p>
-      )}
+      <div className="grid w-full grid-cols-2 gap-3">
+        <a href="/arena" className="rounded-2xl border border-rose-400/20 bg-gradient-to-br from-rose-950/70 to-slate-950 p-4 transition hover:border-rose-400/50">
+          <div className="text-2xl">⚔️</div><div className="mt-2 font-black">Arena</div><div className="mt-1 text-xs text-slate-400">Fight and earn rewards</div>
+        </a>
+        <a href="/dungeon" className="rounded-2xl border border-amber-400/20 bg-gradient-to-br from-amber-950/60 to-slate-950 p-4 transition hover:border-amber-400/50">
+          <div className="text-2xl">🏰</div><div className="mt-2 font-black">Dungeon</div><div className="mt-1 text-xs text-slate-400">Explore and defeat bosses</div>
+        </a>
+      </div>
+      <a href="/rift" className="w-full rounded-2xl border border-violet-400/30 bg-gradient-to-r from-violet-950/70 via-slate-900 to-fuchsia-950/60 p-4 text-center transition hover:border-violet-300/60">
+        <div className="text-xs font-black uppercase tracking-[0.25em] text-violet-300">New mode</div><div className="mt-1 text-lg font-black">Riftbound: Rune Battle</div><div className="mt-1 text-xs text-slate-400">Master the runes. Survive the Nemesis.</div>
+      </a>
     </div>
   )
 }
